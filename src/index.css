@@ -1,0 +1,378 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --sand: #F6F1E9;
+  --linen: #FBF9F5;
+  --warm-linen: #FBF9F5;
+  --stone: #E6DFD4;
+  --driftwood: #CBBFAF;
+  --sea-glass: #9FBFBB;
+  --deep-ocean: #2F4F4F;
+  --charcoal: #1F2933;
+  --gold-accent: #D9C7A1;
+  --soft-gold: #D9C7A1;
+  --shell-noise: radial-gradient(circle at 1px 1px, rgba(47, 79, 79, 0.05) 1px, transparent 0);
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Force square UI across the site */
+.rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl,
+.rounded-full,
+.rounded-t, .rounded-t-sm, .rounded-t-md, .rounded-t-lg, .rounded-t-xl, .rounded-t-2xl, .rounded-t-3xl,
+.rounded-b, .rounded-b-sm, .rounded-b-md, .rounded-b-lg, .rounded-b-xl, .rounded-b-2xl, .rounded-b-3xl,
+.rounded-l, .rounded-l-sm, .rounded-l-md, .rounded-l-lg, .rounded-l-xl, .rounded-l-2xl, .rounded-l-3xl,
+.rounded-r, .rounded-r-sm, .rounded-r-md, .rounded-r-lg, .rounded-r-xl, .rounded-r-2xl, .rounded-r-3xl,
+.rounded-tl, .rounded-tr, .rounded-bl, .rounded-br,
+.rounded-tl-sm, .rounded-tr-sm, .rounded-bl-sm, .rounded-br-sm,
+.rounded-tl-md, .rounded-tr-md, .rounded-bl-md, .rounded-br-md,
+.rounded-tl-lg, .rounded-tr-lg, .rounded-bl-lg, .rounded-br-lg,
+.rounded-tl-xl, .rounded-tr-xl, .rounded-bl-xl, .rounded-br-xl,
+.rounded-tl-2xl, .rounded-tr-2xl, .rounded-bl-2xl, .rounded-br-2xl,
+.rounded-none {
+  border-radius: 0 !important;
+}
+
+
+.custom-order-card {
+  border-radius: 0.375rem !important;
+}
+
+.contact-form-card {
+  border-radius: 0.375rem !important;
+}
+.subtitle-text {
+  color: #000 !important;
+}
+
+.rounded-ui {
+  border-radius: 9999px !important;
+}
+
+.notif-circle {
+  border-radius: 9999px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe-only {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.drawer-overlay {
+  transition: opacity 260ms ease;
+  opacity: 0;
+}
+.drawer-overlay[data-state="open"],
+.drawer-overlay.is-open {
+  opacity: 1;
+}
+
+.drawer-panel {
+  transition: transform 280ms cubic-bezier(.22,1,.36,1), opacity 240ms ease;
+  transform: translateX(16px);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.drawer-panel[data-state="open"],
+.drawer-panel.is-open {
+  transform: translateX(0);
+  opacity: 1;
+}
+.drawer-panel[data-state="closed"],
+.drawer-panel.is-closed {
+  transform: translateX(16px);
+  opacity: 0;
+}
+
+.menu-panel {
+  transition: transform 260ms cubic-bezier(.22,1,.36,1), opacity 220ms ease;
+  transform: translateY(-10px);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.menu-panel[data-state="open"],
+.menu-panel.is-open {
+  transform: translateY(0);
+  opacity: 1;
+}
+.menu-panel[data-state="closed"],
+.menu-panel.is-closed {
+  transform: translateY(-10px);
+  opacity: 0;
+}
+
+@layer base {
+  body {
+    @apply font-sans text-[17px] leading-7;
+    color: var(--charcoal);
+    background: radial-gradient(circle at 20% 20%, rgba(159, 191, 187, 0.12), transparent 32%),
+      radial-gradient(circle at 80% 0%, rgba(203, 191, 175, 0.16), transparent 36%),
+      linear-gradient(180deg, var(--warm-linen), var(--sand));
+    letter-spacing: 0.01em;
+  }
+
+  button {
+    @apply font-sans;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+  input, textarea, select {
+    border-radius: 12px;
+  }
+}
+
+@layer utilities {
+  /* Landscape phones/tablets under desktop breakpoint: force 4 columns for the home category grid */
+  .mobile-landscape\:grid-cols-4 {
+    @media (orientation: landscape) and (max-width: 1023px) {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+  }
+  /* Landscape phones/tablets under desktop breakpoint: force 4 columns for product grid */
+  .landscape\:grid-cols-4 {
+    @media (orientation: landscape) and (max-width: 1023px) {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+  }
+  /* Landscape phones/tablets under desktop breakpoint: force 4 columns for gallery grids */
+  .gallery-grid.landscape\:grid-cols-4,
+  .sold-grid.landscape\:grid-cols-4 {
+    @media (orientation: landscape) and (max-width: 1023px) {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+  }
+}
+
+
+
+.marquee {
+  width: 100%;
+}
+
+.marqueeTrack {
+  display: flex;
+  width: max-content;
+  animation: marqueeScroll var(--marquee-duration, 38s) linear infinite;
+  will-change: transform;
+}
+
+.marquee:hover .marqueeTrack {
+  animation-play-state: paused;
+}
+
+@keyframes marqueeScroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marqueeTrack {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+@layer components {
+  .rounded-shell {
+    border-radius: 18px !important;
+  }
+  .rounded-shell-lg {
+    border-radius: 24px !important;
+  }
+  .shell-card {
+    background: rgba(250, 248, 244, 0.9);
+    border: 1px solid rgba(200, 191, 178, 0.55);
+    border-radius: 24px;
+    box-shadow:
+      0 14px 48px rgba(47, 79, 79, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(8px);
+  }
+  .shell-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(200, 191, 178, 0.7), transparent);
+  }
+  .shell-pattern {
+    background-image:
+      var(--shell-noise),
+      linear-gradient(120deg, rgba(143, 183, 179, 0.07), rgba(245, 241, 234, 0.5));
+    background-size: 22px 22px, cover;
+  }
+  .lux-shadow {
+    box-shadow:
+      0 28px 60px rgba(31, 41, 51, 0.16),
+      0 10px 30px rgba(47, 79, 79, 0.08);
+  }
+
+  /* Dover Design System helpers (aligned to Home page) */
+  .lux-eyebrow {
+    @apply text-[11px] uppercase tracking-[0.32em];
+    color: rgba(47, 79, 79, 0.78);
+    letter-spacing: 0.32em;
+  }
+
+  .lux-heading {
+    @apply font-serif text-3xl sm:text-4xl; 
+    letter-spacing: 0.03em;
+    color: var(--deep-ocean);
+  }
+
+  .lux-subtitle {
+    @apply text-base leading-relaxed;
+    color: rgba(31, 41, 51, 0.82);
+  }
+
+  .lux-card {
+    @apply rounded-shell-lg border bg-white/85;
+    border-color: rgba(203, 191, 175, 0.75);
+    box-shadow:
+      0 22px 48px rgba(31, 41, 51, 0.12),
+      0 10px 24px rgba(47, 79, 79, 0.08);
+    backdrop-filter: blur(10px);
+  }
+
+  .lux-panel {
+    @apply rounded-shell-lg border bg-linen/80;
+    border-color: rgba(203, 191, 175, 0.6);
+    box-shadow:
+      0 18px 40px rgba(31, 41, 51, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+
+  .lux-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-shell px-5 py-3 uppercase tracking-[0.24em] text-[11px] transition-all duration-200 font-semibold;
+    background: var(--deep-ocean);
+    color: #fff;
+    box-shadow:
+      0 18px 36px rgba(31, 41, 51, 0.22),
+      0 8px 18px rgba(47, 79, 79, 0.12);
+  }
+  .lux-button:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 22px 42px rgba(31, 41, 51, 0.24),
+      0 10px 20px rgba(47, 79, 79, 0.14);
+  }
+  .lux-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .lux-button--ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-shell px-5 py-3 uppercase tracking-[0.24em] text-[11px] transition-all duration-200 font-semibold border;
+    background: rgba(255, 255, 255, 0.82);
+    color: var(--deep-ocean);
+    border-color: rgba(203, 191, 175, 0.8);
+    box-shadow: 0 10px 28px rgba(31, 41, 51, 0.08);
+  }
+  .lux-button--ghost:hover {
+    background: rgba(246, 241, 233, 0.9);
+    transform: translateY(-1px);
+  }
+
+  .lux-button--outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-shell px-5 py-3 uppercase tracking-[0.24em] text-[11px] transition-all duration-200 font-semibold border;
+    background: transparent;
+    color: var(--deep-ocean);
+    border-color: rgba(47, 79, 79, 0.65);
+  }
+  .lux-button--outline:hover {
+    background: rgba(47, 79, 79, 0.06);
+  }
+
+  .lux-input {
+    @apply w-full px-4 py-3 text-[15px] bg-white/85 rounded-shell transition duration-200 outline-none;
+    border: 1px solid rgba(203, 191, 175, 0.85);
+    color: var(--charcoal);
+  }
+  .lux-input:focus {
+    border-color: rgba(47, 79, 79, 0.6);
+    box-shadow: 0 0 0 3px rgba(159, 191, 187, 0.25);
+  }
+
+  .lux-label {
+    @apply text-[12px] uppercase tracking-[0.24em] font-semibold;
+    color: rgba(47, 79, 79, 0.8);
+  }
+
+  /* Admin dashboard form styling */
+  .admin-dashboard .lux-input {
+    @apply font-semibold;
+    letter-spacing: 0.16em;
+    font-size: 12px;
+    color: var(--deep-ocean);
+  }
+  .admin-dashboard .lux-input::placeholder {
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(31, 41, 51, 0.5);
+  }
+  .admin-dashboard select.lux-input option {
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+  }
+
+  .lux-chip {
+    @apply inline-flex items-center justify-center rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-semibold;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(203, 191, 175, 0.6);
+    color: rgba(31, 41, 51, 0.8);
+  }
+
+  .lux-divider-soft {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(203, 191, 175, 0.75), transparent);
+  }
+
+  .lux-pill {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold;
+    background: rgba(159, 191, 187, 0.12);
+    color: var(--deep-ocean);
+    border: 1px solid rgba(203, 191, 175, 0.65);
+  }
+  .lux-pill--cart {
+    @apply inline-flex items-center gap-2 rounded-shell px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-semibold;
+    background: var(--deep-ocean);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    box-shadow: 0 10px 22px rgba(31, 41, 51, 0.2);
+  }
+  .lux-quantity {
+    @apply inline-flex items-center gap-3 rounded-shell px-3 py-2 border bg-white/70;
+    border-color: rgba(203, 191, 175, 0.7);
+  }
+
+  /* Shared section typography */
+  .section-eyebrow {
+    @apply text-[11px] uppercase tracking-[0.32em];
+    color: rgba(47, 79, 79, 0.85);
+  }
+
+  .section-heading {
+    @apply font-serif font-semibold text-4xl md:text-5xl tracking-[0.03em] leading-tight text-deep-ocean;
+  }
+
+  .section-subtext {
+    @apply text-center text-base md:text-lg leading-relaxed max-w-2xl mx-auto;
+    color: rgba(31, 41, 51, 0.85);
+  }
+
+  /* Shared section container */
+  .section-shell {
+    @apply bg-transparent text-[var(--charcoal)];
+    position: relative;
+    z-index: 1;
+  }
+}

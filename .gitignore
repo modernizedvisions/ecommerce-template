@@ -1,0 +1,42 @@
+# Repo hygiene update: ignore build/artifact clutter; keep source (public/, src/components/ui, src/components/admin, db/migrations, functions/api) tracked.
+
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules/
+dist/
+dist-ssr/
+.vercel/
+.cache/
+.wrangler/
+.bolt/
+*.local
+
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+*.db
+*.sqlite
+*.sqlite3
+
+.env
+
+# Git checklist (run manually):
+#   git status
+#   git add .gitignore
+#   git add -A
+#   git commit -m "Add messages/custom orders admin, APIs, migrations, and dialog UI"
+#   git push origin main
