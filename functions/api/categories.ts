@@ -1,5 +1,5 @@
 import { defaultShopCategoryTiles } from '../../src/lib/db/mockData';
-import { normalizeImageUrl } from './lib/images';
+import { normalizeImageUrl } from './_lib/images';
 
 type D1PreparedStatement = {
   all<T>(): Promise<{ results: T[] }>;
@@ -86,9 +86,7 @@ export async function onRequestGet(context: {
   env: { DB: D1Database };
   request: Request;
 }): Promise<Response> {
-  try {
-    await ensureCategorySchema(context.env.DB);
-    await seedDefaultCategories(context.env.DB);
+  try {    await seedDefaultCategories(context.env.DB);
     await ensureOtherItemsCategory(context.env.DB);
 
     const { results } = await context.env.DB
@@ -179,38 +177,8 @@ async function seedDefaultCategories(db: D1Database) {
   }
 }
 
-async function ensureCategorySchema(db: D1Database) {
-  await db.prepare(createCategoriesTable).run();
-
-  for (const ddl of Object.values(REQUIRED_CATEGORY_COLUMNS)) {
-    try {
-      await db.prepare(`ALTER TABLE categories ADD COLUMN ${ddl};`).run();
-    } catch (error) {
-      const message = (error as Error)?.message || '';
-      if (!/duplicate column|already exists/i.test(message)) {
-        console.error('Failed to add column to categories', error);
-      }
-    }
-  }
-
-  // Backfill missing slugs/show_on_homepage values for existing rows if any
-  const { results } = await db
-    .prepare(`SELECT id, name FROM categories WHERE slug IS NULL OR slug = ''`)
-    .all<{ id: string; name: string | null }>();
-  if (results && results.length) {
-    for (const row of results) {
-      if (!row?.id || !row?.name) continue;
-      const slug = toSlug(row.name);
-      await db.prepare(`UPDATE categories SET slug = ? WHERE id = ?;`).bind(slug, row.id).run();
-    }
-  }
-  await db.prepare(`UPDATE categories SET show_on_homepage = 0 WHERE show_on_homepage IS NULL;`).run();
-  await db.prepare(`UPDATE categories SET sort_order = 0 WHERE sort_order IS NULL;`).run();
-  await db
-    .prepare(
-      `UPDATE categories SET hero_image_url = image_url WHERE (hero_image_url IS NULL OR hero_image_url = '') AND image_url IS NOT NULL;`
-    )
-    .run();
+async function ensureCategorySchema(_db: D1Database) {
+  return;
 }
 
 async function ensureOtherItemsCategory(db: D1Database) {
@@ -242,3 +210,5 @@ async function ensureOtherItemsCategory(db: D1Database) {
     return null;
   }
 }
+
+

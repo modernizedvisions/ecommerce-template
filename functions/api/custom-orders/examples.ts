@@ -1,5 +1,5 @@
 import { ensureCustomOrderExamplesSchema } from '../_lib/customOrderExamplesSchema';
-import { normalizeImageUrl } from '../lib/images';
+import { normalizeImageUrl, resolveImageIdsToUrls } from '../_lib/images';
 
 type D1PreparedStatement = {
   all<T>(): Promise<{ results?: T[] }>;
@@ -13,6 +13,7 @@ type D1Database = {
 type ExampleRow = {
   id: string;
   image_url: string | null;
+  image_id?: string | null;
   title: string | null;
   description: string | null;
   tags_json?: string | null;
@@ -27,13 +28,13 @@ const json = (data: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
 
-export async function onRequestGet(context: { env: { DB: D1Database; PUBLIC_IMAGES_BASE_URL?: string }; request: Request }) {
+export async function onRequestGet(context: { env: { DB: D1Database }; request: Request }) {
   try {
     const db = context.env.DB;
     await ensureCustomOrderExamplesSchema(db);
     const { results } = await db
       .prepare(
-        `SELECT id, image_url, title, description, tags_json, sort_order, is_active, created_at
+        `SELECT id, image_url, image_id, title, description, tags_json, sort_order, is_active, created_at
          FROM custom_order_examples
          WHERE is_active = 1
          ORDER BY sort_order ASC, created_at ASC
@@ -41,15 +42,23 @@ export async function onRequestGet(context: { env: { DB: D1Database; PUBLIC_IMAG
       )
       .all<ExampleRow>();
 
+    const ids = (results || []).map((row) => row.image_id || '').filter(Boolean);
+    const idToUrl = await resolveImageIdsToUrls(db as any, ids);
+
     const examples = (results || [])
-      .filter((row) => row?.image_url)
-      .map((row) => ({
-        id: row.id,
-        imageUrl: normalizeImageUrl(row.image_url as string, context.request, context.env),
-        title: row.title || '',
-        description: row.description || '',
-        tags: parseTags(row.tags_json),
-      }));
+      .map((row) => {
+        const resolvedUrl = row.image_id ? idToUrl.get(row.image_id) || row.image_url || '' : row.image_url || '';
+        if (!resolvedUrl) return null;
+        return {
+          id: row.id,
+          imageUrl: normalizeImageUrl(resolvedUrl),
+          imageId: row.image_id || undefined,
+          title: row.title || '',
+          description: row.description || '',
+          tags: parseTags(row.tags_json),
+        };
+      })
+      .filter(Boolean);
 
     return json({ examples });
   } catch (error) {

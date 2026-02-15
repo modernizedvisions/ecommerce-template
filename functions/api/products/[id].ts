@@ -1,5 +1,5 @@
 import type { Product } from '../../../src/lib/types';
-import { ensureProductImageColumns, normalizeImageUrl } from '../lib/images';
+import { normalizeImageUrl } from '../_lib/images';
 
 type D1PreparedStatement = {
   run(): Promise<{ success: boolean; error?: string }>;
@@ -91,8 +91,6 @@ export async function onRequestGet(context: {
 
   try {
     await ensureProductSchema(context.env.DB);
-    await ensureProductImageColumns(context.env.DB);
-
     const row = await context.env.DB.prepare(
       `
       SELECT id, name, slug, description, price_cents, category, image_url, image_urls_json,
@@ -162,17 +160,8 @@ const createProductsTable = `
   );
 `;
 
-async function ensureProductSchema(db: D1Database) {
-  await db.prepare(createProductsTable).run();
-
-  for (const [name, ddl] of Object.entries(REQUIRED_PRODUCT_COLUMNS)) {
-    try {
-      await db.prepare(`ALTER TABLE products ADD COLUMN ${ddl};`).run();
-    } catch (error) {
-      const message = (error as Error)?.message || '';
-      if (!/duplicate column|already exists/i.test(message)) {
-        console.error(`Failed to add column ${name}`, error);
-      }
-    }
-  }
+async function ensureProductSchema(_db: D1Database) {
+  return;
 }
+
+

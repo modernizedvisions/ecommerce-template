@@ -91,85 +91,8 @@ export async function onRequestPatch(context: {
   }
 }
 
-async function ensureCustomOrdersSchema(db: D1Database) {
-  await db.prepare(`CREATE TABLE IF NOT EXISTS custom_orders (
-    id TEXT PRIMARY KEY,
-    display_custom_order_id TEXT,
-    customer_name TEXT,
-    customer_email TEXT,
-    description TEXT,
-    image_url TEXT,
-    amount INTEGER,
-    shipping_cents INTEGER NOT NULL DEFAULT 0,
-    message_id TEXT,
-    status TEXT DEFAULT 'pending',
-    payment_link TEXT,
-    archived INTEGER NOT NULL DEFAULT 0,
-    archived_at TEXT,
-    stripe_session_id TEXT,
-    stripe_payment_intent_id TEXT,
-    paid_at TEXT,
-    shipping_name TEXT,
-    shipping_line1 TEXT,
-    shipping_line2 TEXT,
-    shipping_city TEXT,
-    shipping_state TEXT,
-    shipping_postal_code TEXT,
-    shipping_country TEXT,
-    shipping_phone TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );`).run();
-
-  await db.prepare(`CREATE TABLE IF NOT EXISTS custom_order_counters (
-    year INTEGER PRIMARY KEY,
-    counter INTEGER NOT NULL
-  );`).run();
-
-  const columns = await db.prepare(`PRAGMA table_info(custom_orders);`).all<{ name: string }>();
-  const names = (columns.results || []).map((c) => c.name);
-  if (!names.includes('display_custom_order_id')) {
-    await db.prepare(`ALTER TABLE custom_orders ADD COLUMN display_custom_order_id TEXT;`).run();
-  }
-  if (!names.includes('stripe_session_id')) {
-    await db.prepare(`ALTER TABLE custom_orders ADD COLUMN stripe_session_id TEXT;`).run();
-  }
-  if (!names.includes('stripe_payment_intent_id')) {
-    await db.prepare(`ALTER TABLE custom_orders ADD COLUMN stripe_payment_intent_id TEXT;`).run();
-  }
-  if (!names.includes('paid_at')) {
-    await db.prepare(`ALTER TABLE custom_orders ADD COLUMN paid_at TEXT;`).run();
-  }
-  if (!names.includes('image_url')) {
-    await db.prepare(`ALTER TABLE custom_orders ADD COLUMN image_url TEXT;`).run();
-  }
-  if (!names.includes('shipping_cents')) {
-    await db.prepare(`ALTER TABLE custom_orders ADD COLUMN shipping_cents INTEGER NOT NULL DEFAULT 0;`).run();
-  }
-  if (!names.includes('archived')) {
-    await db.prepare(`ALTER TABLE custom_orders ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;`).run();
-  }
-  if (!names.includes('archived_at')) {
-    await db.prepare(`ALTER TABLE custom_orders ADD COLUMN archived_at TEXT;`).run();
-  }
-  const shippingCols = [
-    'shipping_name',
-    'shipping_line1',
-    'shipping_line2',
-    'shipping_city',
-    'shipping_state',
-    'shipping_postal_code',
-    'shipping_country',
-    'shipping_phone',
-  ];
-  for (const col of shippingCols) {
-    if (!names.includes(col)) {
-      await db.prepare(`ALTER TABLE custom_orders ADD COLUMN ${col} TEXT;`).run();
-    }
-  }
-
-  await db.prepare(
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_orders_display_id ON custom_orders(display_custom_order_id);`
-  ).run();
+async function ensureCustomOrdersSchema(_db: D1Database) {
+  return;
 }
 
 async function getCustomOrdersColumns(db: D1Database) {
@@ -236,4 +159,6 @@ function jsonResponse(data: unknown, status = 200) {
     },
   });
 }
+
+
 

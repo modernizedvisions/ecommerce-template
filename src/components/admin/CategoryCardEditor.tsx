@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import type { Category } from '../../lib/types';
 import { Loader2, Trash2 } from 'lucide-react';
-import { adminUploadImageScoped } from '../../lib/api';
+import { adminUploadImageUnified } from '../../lib/api';
 import { ProgressiveImage } from '../ui/ProgressiveImage';
 
 interface CategoryCardEditorProps {
@@ -52,7 +52,7 @@ export function CategoryCardEditor({ category, onUpdate, onDelete, isBusy }: Cat
   const handleImageSelected = async (file: File) => {
     setIsUpdatingImage(true);
     try {
-      const result = await adminUploadImageScoped(file, {
+      const result = await adminUploadImageUnified(file, {
         scope: 'categories',
         onStatus: (status) => {
           setIsOptimizingImage(status === 'optimizing');
@@ -167,3 +167,4 @@ export function CategoryCardSkeleton() {
     </div>
   );
 }
+

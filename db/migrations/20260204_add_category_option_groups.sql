@@ -1,5 +1,3 @@
-ALTER TABLE categories ADD COLUMN option_group_label TEXT;
-ALTER TABLE categories ADD COLUMN option_group_options_json TEXT;
-
-ALTER TABLE order_items ADD COLUMN option_group_label TEXT;
-ALTER TABLE order_items ADD COLUMN option_value TEXT;
+-- No-op: these columns are part of the canonical schema in db/migrations/live_init.sql.
+-- Keeping this migration executable prevents duplicate-column failures on existing DBs.
+SELECT 1;

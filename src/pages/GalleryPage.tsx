@@ -4,6 +4,7 @@ import { fetchSoldProducts } from '../lib/api';
 import { Product } from '../lib/types';
 import { useGalleryImages } from '../lib/hooks/useGalleryImages';
 import { ProgressiveImage } from '../components/ui/ProgressiveImage';
+import { withImageWidthHint } from '../lib/images';
 
 export function GalleryPage() {
   const [soldProducts, setSoldProducts] = useState<Product[]>([]);
@@ -75,7 +76,7 @@ export function GalleryPage() {
                         onClick={() => setSelectedImage(item.imageUrl)}
                       >
                         <ProgressiveImage
-                          src={item.imageUrl}
+                          src={withImageWidthHint(item.imageUrl, 600)}
                           alt={item.title || 'Gallery item'}
                           className="h-full w-full"
                           imgClassName="w-full h-full object-contain"
@@ -103,7 +104,7 @@ export function GalleryPage() {
                       >
                         {item.imageUrl ? (
                           <ProgressiveImage
-                            src={item.imageUrl}
+                            src={withImageWidthHint(item.imageUrl || '', 600)}
                             alt={getSoldCardTitle(item)}
                             className="h-full w-full"
                             imgClassName="w-full h-full object-cover rounded-2xl"

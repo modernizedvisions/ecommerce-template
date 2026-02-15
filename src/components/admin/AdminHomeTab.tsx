@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import type { CustomOrdersImage, HeroCollageImage, HomeGalleryItem, HomeSiteContent } from '../../lib/types';
 import { AdminSectionHeader } from './AdminSectionHeader';
 import { AdminSaveButton } from './AdminSaveButton';
-import { adminUploadImageScoped, getAdminSiteContentHome, updateAdminSiteContentHome } from '../../lib/api';
+import { adminUploadImageUnified, getAdminSiteContentHome, updateAdminSiteContentHome } from '../../lib/api';
 import { ProgressiveImage } from '../ui/ProgressiveImage';
 
 export function AdminHomeTab() {
@@ -145,7 +145,7 @@ function HeroCollageAdmin({
     });
 
     try {
-      const result = await adminUploadImageScoped(file, {
+      const result = await adminUploadImageUnified(file, {
         scope: 'home',
         onStatus: (status) => {
           onChange((prev) => {
@@ -387,7 +387,7 @@ function HomeGalleryAdmin({ items, onChange, onSave, saveState }: HomeGalleryAdm
     });
 
     try {
-      const result = await adminUploadImageScoped(file, {
+      const result = await adminUploadImageUnified(file, {
         scope: 'home',
         onStatus: (status) => {
           onChange((prev) => {
@@ -583,7 +583,7 @@ function AboutImagesAdmin({ images, onChange, onSave, saveState }: AboutImagesAd
     });
 
     try {
-      const result = await adminUploadImageScoped(file, {
+      const result = await adminUploadImageUnified(file, {
         scope: 'home',
         onStatus: (status) => {
           onChange((prev) => {
@@ -772,3 +772,4 @@ const buildSiteContent = (
   };
   return { heroImages, heroRotationEnabled, homeGallery: homeGallerySlots, aboutImages: aboutImageUrls };
 };
+

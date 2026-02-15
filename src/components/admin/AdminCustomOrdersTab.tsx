@@ -5,7 +5,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useForm } from 'react-hook-form';
 import { AdminSectionHeader } from './AdminSectionHeader';
 import { AdminSaveButton } from './AdminSaveButton';
-import { adminUploadImageScoped } from '../../lib/api';
+import { adminUploadImageUnified } from '../../lib/api';
 import { formatEasternDateTime } from '../../lib/dates';
 
 interface AdminCustomOrdersTabProps {
@@ -158,7 +158,7 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
     });
 
     try {
-      const result = await adminUploadImageScoped(file, {
+      const result = await adminUploadImageUnified(file, {
         scope: 'custom-orders',
         onStatus: (status) => {
           setState((prev) => ({
@@ -988,6 +988,7 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
     </div>
   );
 };
+
 
 
 

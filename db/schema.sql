@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS products (
   image_url TEXT,
   -- Extended fields for inventory + Stripe wiring
   image_urls_json TEXT,
+  primary_image_id TEXT,
+  image_ids_json TEXT,
   is_active INTEGER DEFAULT 1,
   is_one_off INTEGER DEFAULT 1,
   is_sold INTEGER DEFAULT 0,
@@ -29,6 +31,22 @@ CREATE TABLE IF NOT EXISTS categories (
   option_group_options_json TEXT,
   show_on_homepage INTEGER DEFAULT 0,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS images (
+  id TEXT PRIMARY KEY,
+  storage_provider TEXT NOT NULL DEFAULT 'r2',
+  storage_key TEXT NOT NULL,
+  public_url TEXT,
+  content_type TEXT,
+  size_bytes INTEGER,
+  original_filename TEXT,
+  entity_type TEXT,
+  entity_id TEXT,
+  kind TEXT,
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -71,6 +89,7 @@ CREATE TABLE IF NOT EXISTS messages (
   email TEXT,
   message TEXT,
   image_url TEXT,
+  image_id TEXT,
   type TEXT NOT NULL DEFAULT 'message',
   category_id TEXT,
   category_name TEXT,
@@ -86,6 +105,8 @@ CREATE TABLE IF NOT EXISTS custom_orders (
   customer_email TEXT,
   description TEXT,
   image_url TEXT,
+  image_id TEXT,
+  image_storage_key TEXT,
   amount INTEGER,
   shipping_cents INTEGER NOT NULL DEFAULT 0,
   message_id TEXT,
@@ -105,6 +126,7 @@ CREATE TABLE IF NOT EXISTS site_content (
 CREATE TABLE IF NOT EXISTS custom_order_examples (
   id TEXT PRIMARY KEY,
   image_url TEXT NOT NULL,
+  image_id TEXT,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
   tags_json TEXT NOT NULL DEFAULT '[]',
@@ -114,3 +136,15 @@ CREATE TABLE IF NOT EXISTS custom_order_examples (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS gallery_images (
+  id TEXT PRIMARY KEY,
+  url TEXT NOT NULL,
+  image_url TEXT,
+  image_id TEXT,
+  alt_text TEXT,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  position INTEGER DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

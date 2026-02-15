@@ -1,5 +1,5 @@
 import type { Product } from '../../src/lib/types';
-import { ensureProductImageColumns, normalizeImageUrl } from './lib/images';
+import { normalizeImageUrl } from './_lib/images';
 
 type D1PreparedStatement = {
   all<T>(): Promise<{ results: T[] }>;
@@ -45,8 +45,6 @@ type CustomOrderRow = {
 export async function onRequestGet(context: { env: { DB: D1Database }; request: Request }): Promise<Response> {
   try {
     await ensureProductSchema(context.env.DB);
-    await ensureProductImageColumns(context.env.DB);
-
     const url = new URL(context.request.url);
     const filter = url.searchParams.get('filter');
 
@@ -216,17 +214,8 @@ const createProductsTable = `
   );
 `;
 
-async function ensureProductSchema(db: D1Database) {
-  await db.prepare(createProductsTable).run();
-
-  for (const [name, ddl] of Object.entries(REQUIRED_PRODUCT_COLUMNS)) {
-    try {
-      await db.prepare(`ALTER TABLE products ADD COLUMN ${ddl};`).run();
-    } catch (error) {
-      const message = (error as Error)?.message || '';
-      if (!/duplicate column|already exists/i.test(message)) {
-        console.error(`Failed to add column ${name}`, error);
-      }
-    }
-  }
+async function ensureProductSchema(_db: D1Database) {
+  return;
 }
+
+

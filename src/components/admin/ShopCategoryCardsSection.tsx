@@ -3,7 +3,7 @@ import {
   fetchShopCategoryTiles,
   saveShopCategoryTiles,
   adminUpdateCategory,
-  adminUploadImageScoped,
+  adminUploadImageUnified,
   getAdminSiteContentHome,
   updateAdminSiteContentHome,
 } from '../../lib/api';
@@ -109,7 +109,7 @@ export function ShopCategoryCardsSection({ categories = [], onCategoryUpdated }:
     const runUpload = async () => {
       try {
         setTileStatus((prev) => ({ ...prev, [tileId]: 'optimizing' }));
-        const result = await adminUploadImageScoped(file, {
+        const result = await adminUploadImageUnified(file, {
           scope: 'categories',
           onStatus: (status) => {
             setTileStatus((prev) => ({ ...prev, [tileId]: status }));
@@ -382,3 +382,4 @@ const findCategoryBySlug = (categories: Category[], slug?: string) => {
   if (!slug) return undefined;
   return categories.find((c) => (c.slug || '').toLowerCase() === slug.toLowerCase());
 };
+

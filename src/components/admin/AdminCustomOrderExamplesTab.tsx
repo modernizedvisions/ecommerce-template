@@ -3,11 +3,12 @@ import { Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminSectionHeader } from './AdminSectionHeader';
 import { AdminSaveButton } from './AdminSaveButton';
-import { adminFetchCustomOrderExamples, adminSaveCustomOrderExamples, adminUploadImageScoped } from '../../lib/api';
+import { adminFetchCustomOrderExamples, adminSaveCustomOrderExamples, adminUploadImageUnified } from '../../lib/api';
 
 type ExampleSlot = {
   id: string;
   imageUrl: string;
+  imageId?: string | null;
   title: string;
   description: string;
   tags: string;
@@ -23,6 +24,7 @@ const buildEmptySlots = (): ExampleSlot[] =>
   Array.from({ length: SLOT_COUNT }).map((_, idx) => ({
     id: crypto.randomUUID(),
     imageUrl: '',
+    imageId: null,
     title: '',
     description: '',
     tags: '',
@@ -53,6 +55,7 @@ export function AdminCustomOrderExamplesTab() {
             ...slot,
             id: ex.id || slot.id,
             imageUrl: ex.imageUrl || '',
+            imageId: ex.imageId || null,
             title: ex.title || '',
             description: ex.description || '',
             tags: Array.isArray(ex.tags) ? ex.tags.join(', ') : '',
@@ -92,13 +95,14 @@ export function AdminCustomOrderExamplesTab() {
       )
     );
     try {
-      const result = await adminUploadImageScoped(file, { scope: 'custom-orders' });
+      const result = await adminUploadImageUnified(file, { scope: 'custom-orders' });
       setSlots((prev) =>
         prev.map((slot, idx) =>
           idx === index
             ? {
                 ...slot,
                 imageUrl: result.url,
+                imageId: result.imageId ?? null,
                 isActive: true,
                 isUploading: false,
                 uploadError: null,
@@ -127,12 +131,13 @@ export function AdminCustomOrderExamplesTab() {
     setSlots((prev) =>
       prev.map((slot, idx) =>
         idx === index
-          ? {
-              ...slot,
-              imageUrl: '',
-              isActive: false,
-              uploadError: null,
-            }
+            ? {
+                ...slot,
+                imageUrl: '',
+                imageId: null,
+                isActive: false,
+                uploadError: null,
+              }
           : slot
       )
     );
@@ -162,6 +167,7 @@ export function AdminCustomOrderExamplesTab() {
       const payload = slots.map((slot, idx) => ({
         id: slot.id,
         imageUrl: slot.imageUrl || '',
+        imageId: slot.imageId || null,
         title: slot.title.trim(),
         description: slot.description.trim(),
         tags: slot.tags
@@ -180,6 +186,7 @@ export function AdminCustomOrderExamplesTab() {
           ...slot,
           id: ex.id || slot.id,
           imageUrl: ex.imageUrl || '',
+          imageId: ex.imageId || null,
           title: ex.title || '',
           description: ex.description || '',
           tags: Array.isArray(ex.tags) ? ex.tags.join(', ') : '',
@@ -224,7 +231,13 @@ export function AdminCustomOrderExamplesTab() {
             <div key={slot.id} className="lux-panel p-3 space-y-3">
               <div className="relative aspect-[4/5] bg-linen/80 rounded-shell-lg overflow-hidden flex items-center justify-center">
                 {slot.imageUrl ? (
-                  <img src={slot.imageUrl} alt={slot.title || `Example ${idx + 1}`} className="h-full w-full object-cover" />
+                  <img
+                    src={slot.imageUrl}
+                    alt={slot.title || `Example ${idx + 1}`}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 ) : (
                   <div className="text-[11px] uppercase tracking-[0.2em] text-charcoal/60 flex flex-col items-center gap-2 font-semibold">
                     <Plus className="h-5 w-5" />
@@ -312,3 +325,4 @@ export function AdminCustomOrderExamplesTab() {
     </div>
   );
 }
+

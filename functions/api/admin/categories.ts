@@ -1,6 +1,5 @@
 import { defaultShopCategoryTiles } from '../../../src/lib/db/mockData';
 import {
-  ensureImagesSchema,
   normalizeImageUrl,
   resolveImageIdsToUrls,
   resolveImageUrlsToIds,
@@ -99,9 +98,7 @@ const resolveCategoryImageInput = async (
   const rawId = typeof input.imageId === 'string' ? input.imageId.trim() : '';
   const rawUrl = typeof input.imageUrl === 'string' ? input.imageUrl.trim() : '';
 
-  if (rawId && !rawUrl) {
-    await ensureImagesSchema(db);
-    const map = await resolveImageIdsToUrls(db, [rawId], request, env);
+  if (rawId && !rawUrl) {    const map = await resolveImageIdsToUrls(db, [rawId], request, env);
     const resolved = map.get(rawId) || '';
     return {
       imageId: rawId,
@@ -109,9 +106,7 @@ const resolveCategoryImageInput = async (
     };
   }
 
-  if (!rawId && rawUrl) {
-    await ensureImagesSchema(db);
-    const map = await resolveImageUrlsToIds(db, [rawUrl]);
+  if (!rawId && rawUrl) {    const map = await resolveImageUrlsToIds(db, [rawUrl]);
     const resolvedId = map.get(rawUrl) || null;
     return {
       imageId: resolvedId,
@@ -179,9 +174,7 @@ export async function onRequest(context: { env: { DB: D1Database }; request: Req
 
   try {
     const unauthorized = await requireAdmin(context.request, context.env);
-    if (unauthorized) return unauthorized;
-    await ensureCategorySchema(context.env.DB);
-    await seedDefaultCategories(context.env.DB);
+    if (unauthorized) return unauthorized;    await seedDefaultCategories(context.env.DB);
     await ensureOtherItemsCategory(context.env.DB);
 
     if (method === 'GET') {
@@ -512,38 +505,8 @@ async function seedDefaultCategories(db: D1Database) {
   }
 }
 
-async function ensureCategorySchema(db: D1Database) {
-  await db.prepare(createCategoriesTable).run();
-
-  for (const ddl of Object.values(REQUIRED_CATEGORY_COLUMNS)) {
-    try {
-      await db.prepare(`ALTER TABLE categories ADD COLUMN ${ddl};`).run();
-    } catch (error) {
-      const message = (error as Error)?.message || '';
-      if (!/duplicate column|already exists/i.test(message)) {
-        console.error('Failed to add column to categories', error);
-      }
-    }
-  }
-
-  const { results } = await db
-    .prepare(`SELECT id, name FROM categories WHERE slug IS NULL OR slug = ''`)
-    .all<{ id: string; name: string | null }>();
-  if (results && results.length) {
-    for (const row of results) {
-      if (!row?.id || !row?.name) continue;
-      const slug = toSlug(row.name);
-      await db.prepare(`UPDATE categories SET slug = ? WHERE id = ?;`).bind(slug, row.id).run();
-    }
-  }
-  await db.prepare(`UPDATE categories SET show_on_homepage = 0 WHERE show_on_homepage IS NULL;`).run();
-  await db.prepare(`UPDATE categories SET sort_order = 0 WHERE sort_order IS NULL;`).run();
-  await db
-    .prepare(
-      `UPDATE categories SET hero_image_url = image_url WHERE (hero_image_url IS NULL OR hero_image_url = '') AND image_url IS NOT NULL;`
-    )
-    .run();
-  await ensureOtherItemsCategory(db);
+async function ensureCategorySchema(_db: D1Database) {
+  return;
 }
 
 const json = (data: unknown, status = 200) =>
@@ -587,4 +550,6 @@ async function ensureOtherItemsCategory(db: D1Database) {
     return null;
   }
 }
+
+
 

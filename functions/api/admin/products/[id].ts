@@ -1,8 +1,6 @@
 import type { Product } from '../../../../src/lib/types';
 import {
-  ensureImagesSchema,
-  ensureProductImageColumns,
-  normalizeImageUrl,
+    normalizeImageUrl,
   resolveImageIdsToUrls,
   resolveImageUrlsToIds,
 } from '../../lib/images';
@@ -156,19 +154,8 @@ const createProductsTable = `
   );
 `;
 
-async function ensureProductSchema(db: D1Database) {
-  await db.prepare(createProductsTable).run();
-
-  for (const [name, ddl] of Object.entries(REQUIRED_PRODUCT_COLUMNS)) {
-    try {
-      await db.prepare(`ALTER TABLE products ADD COLUMN ${ddl};`).run();
-    } catch (error) {
-      const message = (error as Error)?.message || '';
-      if (!/duplicate column|already exists/i.test(message)) {
-        console.error(`Failed to add column ${name}`, error);
-      }
-    }
-  }
+async function ensureProductSchema(_db: D1Database) {
+  return;
 }
 
 const normalizeStringArray = (value: unknown): string[] => {
@@ -200,7 +187,6 @@ const resolveProductImagePayload = async (
   const rawImageUrls = normalizeStringArray(input.imageUrls);
 
   if (rawPrimaryId || rawImageIds.length) {
-    await ensureImagesSchema(db);
     const ids = [rawPrimaryId, ...rawImageIds].filter(Boolean);
     const map = await resolveImageIdsToUrls(db, ids, request, env);
     const primaryFromId = rawPrimaryId ? map.get(rawPrimaryId) || '' : '';
@@ -224,7 +210,6 @@ const resolveProductImagePayload = async (
   let primaryImageId: string | undefined;
   let imageIds: string[] = [];
   if (normalizedPrimary || normalizedRest.length) {
-    await ensureImagesSchema(db);
     const map = await resolveImageUrlsToIds(db, [normalizedPrimary, ...normalizedRest].filter(Boolean));
     primaryImageId = normalizedPrimary ? map.get(normalizedPrimary) : undefined;
     imageIds = normalizedRest.map((url) => map.get(url)).filter(Boolean) as string[];
@@ -306,7 +291,6 @@ export async function onRequestPut(context: {
     const values: unknown[] = [];
 
     await ensureProductSchema(context.env.DB);
-    await ensureProductImageColumns(context.env.DB);
     try {
       const table = await context.env.DB.prepare(
         `SELECT name FROM sqlite_master WHERE type='table' AND name='products';`
@@ -553,4 +537,8 @@ export async function onRequestDelete(context: {
     });
   }
 }
+
+
+
+
 

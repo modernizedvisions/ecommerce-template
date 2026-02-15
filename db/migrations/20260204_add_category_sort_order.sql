@@ -1,1 +1,2 @@
-ALTER TABLE categories ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+-- No-op: sort_order exists in db/migrations/live_init.sql baseline.
+SELECT 1;

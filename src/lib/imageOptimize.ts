@@ -16,6 +16,7 @@ export function buildOptimizedImageSrc(
   preset: ImagePreset
 ): { primarySrc: string; fallbackSrc: string } {
   const fallbackSrc = inputSrc;
+  const hintedSrc = addWidthHint(inputSrc, preset);
 
   try {
     if (!inputSrc || preset === 'full' || inputSrc.includes('/cdn-cgi/image')) {
@@ -24,7 +25,7 @@ export function buildOptimizedImageSrc(
 
     const optimizer = (import.meta.env.VITE_IMAGE_OPTIMIZER || 'off').toLowerCase();
     if (optimizer !== 'cdncgi') {
-      return { primarySrc: fallbackSrc, fallbackSrc };
+      return { primarySrc: hintedSrc, fallbackSrc };
     }
 
     const normalizedPath = normalizeImagesPath(inputSrc);
@@ -65,4 +66,29 @@ function parsePositiveInt(value: string | undefined, fallback: number) {
   if (!value) return fallback;
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function addWidthHint(inputSrc: string, preset: ImagePreset): string {
+  if (!inputSrc || preset === 'full') return inputSrc;
+
+  const width = preset === 'thumb' ? 600 : 900;
+  try {
+    if (inputSrc.startsWith('/images/')) {
+      const [path, query = ''] = inputSrc.split('?', 2);
+      const params = new URLSearchParams(query);
+      if (!params.has('w')) params.set('w', String(width));
+      const qs = params.toString();
+      return qs ? `${path}?${qs}` : path;
+    }
+
+    const parsed = new URL(inputSrc);
+    if (typeof window !== 'undefined' && parsed.origin === window.location.origin && parsed.pathname.startsWith('/images/')) {
+      if (!parsed.searchParams.has('w')) parsed.searchParams.set('w', String(width));
+      return `${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    return inputSrc;
+  }
+
+  return inputSrc;
 }

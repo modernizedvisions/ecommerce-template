@@ -1,9 +1,15 @@
 type Env = {
   IMAGES_BUCKET?: R2Bucket;
   PUBLIC_IMAGES_BASE_URL?: string;
+  IMAGE_STORAGE_PREFIX?: string;
 };
 
 const DEBUG_FINGERPRINT = 'shop-images-state-2025-12-21';
+
+const normalizePrefix = (value?: string) => {
+  const trimmed = (value || 'site').trim().replace(/^\/+/, '').replace(/\/+$/, '');
+  return trimmed || 'site';
+};
 
 export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
   const { env } = context;
@@ -13,7 +19,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   if (env.IMAGES_BUCKET?.list) {
     try {
       const result = await env.IMAGES_BUCKET.list({
-        prefix: 'doverdesign/',
+        prefix: `${normalizePrefix(env.IMAGE_STORAGE_PREFIX)}/`,
         limit: 10,
       });
       keys = result.objects.map((obj) => obj.key);
@@ -31,6 +37,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       envPresent: {
         IMAGES_BUCKET: !!env.IMAGES_BUCKET,
         PUBLIC_IMAGES_BASE_URL: !!env.PUBLIC_IMAGES_BASE_URL,
+        IMAGE_STORAGE_PREFIX: !!env.IMAGE_STORAGE_PREFIX,
       },
       keys,
       listError,

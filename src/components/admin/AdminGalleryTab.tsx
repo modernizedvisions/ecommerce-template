@@ -2,7 +2,7 @@ import React from 'react';
 import { Eye, EyeOff, Plus, Trash2, Upload } from 'lucide-react';
 import { AdminSectionHeader } from './AdminSectionHeader';
 import { AdminSaveButton } from './AdminSaveButton';
-import { adminUploadImageScoped } from '../../lib/api';
+import { adminUploadImageUnified } from '../../lib/api';
 import { ProgressiveImage } from '../ui/ProgressiveImage';
 
 export type AdminGalleryItem = {
@@ -99,7 +99,7 @@ function GalleryAdmin({
       for (const img of queued) {
         if (!img.file) continue;
         try {
-          const result = await adminUploadImageScoped(img.file, {
+          const result = await adminUploadImageUnified(img.file, {
             scope: 'gallery',
             onStatus: (status) => {
               onChange((prev) =>
@@ -213,7 +213,7 @@ function GalleryAdmin({
       )
     );
     try {
-      const result = await adminUploadImageScoped(target.file, { scope: 'gallery' });
+      const result = await adminUploadImageUnified(target.file, { scope: 'gallery' });
       if (target.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(target.previewUrl);
       onChange((prev) =>
         prev.map((img) =>
@@ -411,3 +411,4 @@ function GalleryAdmin({
     </div>
   );
 }
+

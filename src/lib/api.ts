@@ -59,6 +59,7 @@ export type UploadScope = 'products' | 'gallery' | 'home' | 'categories' | 'cust
 export type CustomOrderExample = {
   id: string;
   imageUrl: string;
+  imageId?: string;
   title: string;
   description: string;
   tags: string[];
@@ -87,7 +88,7 @@ export async function fetchGalleryImages() {
 }
 
 export async function saveGalleryImages(images: any[]) {
-  const response = await fetch('/api/gallery', {
+  const response = await adminFetch('/api/gallery', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ images }),
@@ -199,7 +200,14 @@ export async function adminDeleteCategory(id: string): Promise<void> {
 
 export async function adminUploadImage(
   file: File,
-  opts?: { onStatus?: (status: 'optimizing' | 'uploading') => void }
+  opts?: {
+    onStatus?: (status: 'optimizing' | 'uploading') => void;
+    entityType?: string;
+    entityId?: string;
+    kind?: string;
+    isPrimary?: boolean;
+    sortOrder?: number;
+  }
 ): Promise<{
   id: string;
   url: string;
@@ -207,12 +215,28 @@ export async function adminUploadImage(
   storageKey?: string;
   warning?: string;
 }> {
-  return adminUploadImageScoped(file, { scope: 'products', onStatus: opts?.onStatus });
+  return adminUploadImageUnified(file, {
+    scope: 'products',
+    onStatus: opts?.onStatus,
+    entityType: opts?.entityType,
+    entityId: opts?.entityId,
+    kind: opts?.kind,
+    isPrimary: opts?.isPrimary,
+    sortOrder: opts?.sortOrder,
+  });
 }
 
-export async function adminUploadImageScoped(
+export async function adminUploadImageUnified(
   file: File,
-  opts?: { scope?: UploadScope; onStatus?: (status: 'optimizing' | 'uploading') => void }
+  opts?: {
+    scope?: UploadScope;
+    onStatus?: (status: 'optimizing' | 'uploading') => void;
+    entityType?: string;
+    entityId?: string;
+    kind?: string;
+    isPrimary?: boolean;
+    sortOrder?: number;
+  }
 ): Promise<{
   id: string;
   url: string;
@@ -220,7 +244,6 @@ export async function adminUploadImageScoped(
   storageKey?: string;
   warning?: string;
 }> {
-  const rid = crypto.randomUUID();
   const scope = opts?.scope || 'products';
   const maxDimension = scope === 'home' ? 2400 : 1600;
   const targetBytes = scope === 'home' ? 900 * 1024 : 500 * 1024;
@@ -252,72 +275,158 @@ export async function adminUploadImageScoped(
   }
   opts?.onStatus?.('uploading');
 
-  const form = new FormData();
-  form.append('file', uploadFile, uploadFile.name || 'upload');
-  const url = `/api/admin/images/upload?rid=${encodeURIComponent(rid)}&scope=${encodeURIComponent(scope)}`;
-  const method = 'POST';
-  console.debug('[admin image upload] request', {
-    rid,
-    url,
-    method,
-    scope,
-    bodyIsFormData: form instanceof FormData,
-    fileCount: 1,
-    fileSizes: [uploadFile.size],
-    fileName: uploadFile.name,
-    fileType: uploadFile.type,
+  const createResponse = await adminFetch('/api/admin/images/create-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      scope,
+      filename: uploadFile.name || 'upload',
+      contentType: uploadFile.type,
+      sizeBytes: uploadFile.size,
+      entityType: opts?.entityType,
+      entityId: opts?.entityId,
+      kind: opts?.kind,
+      isPrimary: !!opts?.isPrimary,
+      sortOrder: opts?.sortOrder,
+    }),
   });
 
-  const response = await adminFetch(url, {
-    method,
+  let createData: any = null;
+  try {
+    createData = await createResponse.json();
+  } catch {
+    throw new Error('Create upload response was not valid JSON');
+  }
+
+  if (!createResponse.ok || createData?.ok === false) {
+    const detail = createData?.detail || createData?.code || 'unknown';
+    throw new Error(`Image create-upload failed (${createResponse.status}): ${detail}`);
+  }
+
+  const imageId = createData?.image?.id as string | undefined;
+  const storageKey = createData?.image?.storageKey as string | undefined;
+  const createdPublicUrl = createData?.image?.publicUrl as string | undefined;
+  const mode = createData?.mode as 'presigned' | 'server' | undefined;
+
+  if (!imageId || !storageKey) {
+    throw new Error('Create upload response missing image id/storage key');
+  }
+
+  if (mode === 'presigned' && createData?.upload?.url) {
+    const uploadRes = await fetch(createData.upload.url, {
+      method: createData.upload.method || 'PUT',
+      headers: createData.upload.headers || { 'Content-Type': uploadFile.type },
+      body: uploadFile,
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error(`Presigned upload failed (${uploadRes.status})`);
+    }
+
+    const finalizeResponse = await adminFetch('/api/admin/images/finalize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        imageId,
+        entityType: opts?.entityType,
+        entityId: opts?.entityId,
+        kind: opts?.kind,
+        isPrimary: !!opts?.isPrimary,
+        sortOrder: opts?.sortOrder,
+      }),
+    });
+
+    let finalizeData: any = null;
+    try {
+      finalizeData = await finalizeResponse.json();
+    } catch {
+      throw new Error('Finalize response was not valid JSON');
+    }
+
+    if (!finalizeResponse.ok || finalizeData?.ok === false) {
+      const detail = finalizeData?.detail || finalizeData?.code || 'unknown';
+      throw new Error(`Finalize failed (${finalizeResponse.status}): ${detail}`);
+    }
+
+    const publicUrl = finalizeData?.image?.publicUrl || createdPublicUrl;
+    return {
+      id: imageId,
+      url: normalizeImageUrl(publicUrl),
+      imageId,
+      storageKey: finalizeData?.image?.storageKey || storageKey,
+    };
+  }
+
+  const form = new FormData();
+  form.append('file', uploadFile, uploadFile.name || 'upload');
+  form.append('imageId', imageId);
+  if (opts?.entityType) form.append('entityType', opts.entityType);
+  if (opts?.entityId) form.append('entityId', opts.entityId);
+  if (opts?.kind) form.append('kind', opts.kind);
+  if (opts?.isPrimary !== undefined) form.append('isPrimary', opts.isPrimary ? '1' : '0');
+  if (opts?.sortOrder !== undefined) form.append('sortOrder', String(opts.sortOrder));
+
+  const uploadResponse = await adminFetch(`/api/admin/images/upload?scope=${encodeURIComponent(scope)}`, {
+    method: 'POST',
     headers: {
-      'X-Upload-Request-Id': rid,
+      Accept: 'application/json',
     },
     body: form,
   });
 
   let data: any = null;
   try {
-    data = await response.json();
-  } catch (err) {
+    data = await uploadResponse.json();
+  } catch {
     throw new Error('Upload response was not valid JSON');
   }
 
-  const responseText = data ? JSON.stringify(data) : '';
-  console.debug('[admin image upload] response', {
-    rid,
-    status: response.status,
-    body: responseText,
-  });
-
-  if (response.status === 401) {
+  if (uploadResponse.status === 401) {
     notifyAdminAuthRequired();
     throw new Error('Admin session expired. Please re-authenticate.');
   }
 
-  if (!response.ok) {
-    const trimmed = responseText.length > 500 ? `${responseText.slice(0, 500)}...` : responseText;
-    throw new Error(`Image upload failed rid=${rid} status=${response.status} body=${trimmed}`);
+  if (!uploadResponse.ok || data?.ok === false) {
+    const detail = data?.detail || data?.code || 'unknown';
+    throw new Error(`Image upload failed (${uploadResponse.status}): ${detail}`);
   }
 
-  if (data?.ok === false) {
-    throw new Error(
-      `Image upload failed rid=${rid} status=${response.status} body=${responseText || 'unknown error'}`
-    );
-  }
-
-  const imageId = data?.image?.id ?? data?.id ?? null;
+  const uploadedImageId = data?.image?.id ?? data?.id ?? imageId;
   const publicUrl = data?.image?.publicUrl ?? data?.url ?? null;
-  const storageKey = data?.image?.storageKey ?? undefined;
+  const uploadedStorageKey = data?.image?.storageKey ?? storageKey;
   const warning = data?.warning ?? undefined;
 
   if (!publicUrl) {
-    throw new Error(`Image upload failed rid=${rid} status=${response.status} body=missing-fields payload=${responseText}`);
+    throw new Error('Image upload response missing publicUrl');
   }
-  if (warning) {
-    console.warn('[admin image upload] warning', { rid, warning });
+  return {
+    id: uploadedImageId,
+    url: normalizeImageUrl(publicUrl),
+    imageId: uploadedImageId,
+    storageKey: uploadedStorageKey,
+    warning,
+  };
+}
+
+export async function adminUploadImageScoped(
+  file: File,
+  opts?: {
+    scope?: UploadScope;
+    onStatus?: (status: 'optimizing' | 'uploading') => void;
+    entityType?: string;
+    entityId?: string;
+    kind?: string;
+    isPrimary?: boolean;
+    sortOrder?: number;
   }
-  return { id: imageId || rid, url: normalizeImageUrl(publicUrl), imageId, storageKey, warning };
+): Promise<{
+  id: string;
+  url: string;
+  imageId?: string | null;
+  storageKey?: string;
+  warning?: string;
+}> {
+  return adminUploadImageUnified(file, opts);
 }
 
 export async function adminUploadImagesSequential(

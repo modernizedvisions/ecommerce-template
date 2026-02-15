@@ -1,6 +1,6 @@
 import { requireAdmin } from '../../_lib/adminAuth';
 import { ensureCustomOrderExamplesSchema } from '../../_lib/customOrderExamplesSchema';
-import { normalizeImageUrl } from '../../lib/images';
+import { normalizeImageUrl, resolveImageIdsToUrls, resolveImageUrlsToIds } from '../../_lib/images';
 
 type D1PreparedStatement = {
   all<T>(): Promise<{ results?: T[] }>;
@@ -15,6 +15,7 @@ type D1Database = {
 type ExampleRow = {
   id: string;
   image_url: string | null;
+  image_id?: string | null;
   title: string | null;
   description: string | null;
   tags_json?: string | null;
@@ -32,30 +33,40 @@ const json = (data: unknown, status = 200) =>
   });
 
 export async function onRequestGet(context: {
-  env: { DB: D1Database; PUBLIC_IMAGES_BASE_URL?: string };
+  env: { DB: D1Database };
   request: Request;
 }): Promise<Response> {
-  const unauthorized = await requireAdmin(context.request, context.env);
+  const unauthorized = await requireAdmin(context.request, context.env as any);
   if (unauthorized) return unauthorized;
+
   try {
     const db = context.env.DB;
     await ensureCustomOrderExamplesSchema(db);
     const { results } = await db
       .prepare(
-        `SELECT id, image_url, title, description, tags_json, sort_order, is_active, created_at
+        `SELECT id, image_url, image_id, title, description, tags_json, sort_order, is_active, created_at
          FROM custom_order_examples
          ORDER BY sort_order ASC, created_at ASC;`
       )
       .all<ExampleRow>();
-    const examples = (results || []).map((row) => ({
-      id: row.id,
-      imageUrl: row.image_url ? normalizeImageUrl(row.image_url, context.request, context.env) : '',
-      title: row.title || '',
-      description: row.description || '',
-      tags: parseTags(row.tags_json),
-      sortOrder: row.sort_order ?? 0,
-      isActive: row.is_active !== 0,
-    }));
+
+    const ids = (results || []).map((row) => row.image_id || '').filter(Boolean);
+    const idToUrl = await resolveImageIdsToUrls(db as any, ids);
+
+    const examples = (results || []).map((row) => {
+      const resolvedUrl = row.image_id ? idToUrl.get(row.image_id) || row.image_url || '' : row.image_url || '';
+      return {
+        id: row.id,
+        imageUrl: resolvedUrl ? normalizeImageUrl(resolvedUrl) : '',
+        imageId: row.image_id || undefined,
+        title: row.title || '',
+        description: row.description || '',
+        tags: parseTags(row.tags_json),
+        sortOrder: row.sort_order ?? 0,
+        isActive: row.is_active !== 0,
+      };
+    });
+
     return json({ examples });
   } catch (error) {
     console.error('[admin/custom-orders/examples] fetch failed', error);
@@ -64,56 +75,61 @@ export async function onRequestGet(context: {
 }
 
 export async function onRequestPut(context: {
-  env: { DB: D1Database; PUBLIC_IMAGES_BASE_URL?: string };
+  env: { DB: D1Database };
   request: Request;
 }): Promise<Response> {
-  const unauthorized = await requireAdmin(context.request, context.env);
+  const unauthorized = await requireAdmin(context.request, context.env as any);
   if (unauthorized) return unauthorized;
 
   try {
     const db = context.env.DB;
     await ensureCustomOrderExamplesSchema(db);
+
     const body = (await context.request.json().catch(() => null)) as any;
     if (!Array.isArray(body?.examples)) {
       return json({ error: 'Invalid payload', detail: 'examples must be an array' }, 400);
     }
 
     const incoming = body.examples.slice(0, 9);
+    const urlsForLookup: string[] = [];
+
     const normalized = incoming.map((item: any, idx: number) => {
       const rawUrl = typeof item?.imageUrl === 'string' ? item.imageUrl.trim() : '';
-      if (rawUrl && (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:'))) {
+      const imageUrl = normalizeImageUrl(rawUrl);
+      if (imageUrl && (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:'))) {
         throw new Error('Image URLs must be normal URLs (no data/blob URLs).');
       }
-      if (rawUrl && rawUrl.length > MAX_URL_LENGTH) {
+      if (imageUrl && imageUrl.length > MAX_URL_LENGTH) {
         throw new Error(`Image URL too long (max ${MAX_URL_LENGTH} chars).`);
       }
-      const isActive =
-        typeof item?.isActive === 'boolean'
-          ? item.isActive
-          : rawUrl
-            ? true
-            : false;
-      const tags = normalizeTags(item?.tags);
+      if (imageUrl) urlsForLookup.push(imageUrl);
+      const isActive = typeof item?.isActive === 'boolean' ? item.isActive : !!imageUrl;
+
       return {
         id: typeof item?.id === 'string' && item.id.trim() ? item.id.trim() : crypto.randomUUID(),
-        imageUrl: rawUrl || '',
+        imageUrl,
+        imageId: typeof item?.imageId === 'string' && item.imageId.trim() ? item.imageId.trim() : null,
         title: typeof item?.title === 'string' ? item.title.trim() : '',
         description: typeof item?.description === 'string' ? item.description.trim() : '',
-        tags,
+        tags: normalizeTags(item?.tags),
         sortOrder: Number.isFinite(Number(item?.sortOrder)) ? Number(item.sortOrder) : idx,
         isActive,
       };
     });
 
+    const urlMap = await resolveImageUrlsToIds(db as any, urlsForLookup);
+
     await db.prepare(`DELETE FROM custom_order_examples;`).run();
 
     for (let i = 0; i < normalized.length; i += 1) {
       const example = normalized[i];
-      await db
+      const resolvedImageId = example.imageId || (example.imageUrl ? urlMap.get(example.imageUrl) || null : null);
+      const inserted = await db
         .prepare(
           `INSERT INTO custom_order_examples (
             id,
             image_url,
+            image_id,
             title,
             description,
             tags_json,
@@ -121,11 +137,12 @@ export async function onRequestPut(context: {
             is_active,
             created_at,
             updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
         )
         .bind(
           example.id,
           example.imageUrl,
+          resolvedImageId,
           example.title,
           example.description,
           JSON.stringify(example.tags),
@@ -135,27 +152,13 @@ export async function onRequestPut(context: {
           new Date().toISOString()
         )
         .run();
+
+      if (!inserted.success) {
+        throw new Error(inserted.error || 'Insert failed');
+      }
     }
 
-    const { results } = await db
-      .prepare(
-        `SELECT id, image_url, title, description, tags_json, sort_order, is_active, created_at
-         FROM custom_order_examples
-         ORDER BY sort_order ASC, created_at ASC;`
-      )
-      .all<ExampleRow>();
-
-    const examples = (results || []).map((row) => ({
-      id: row.id,
-      imageUrl: row.image_url ? normalizeImageUrl(row.image_url, context.request, context.env) : '',
-      title: row.title || '',
-      description: row.description || '',
-      tags: parseTags(row.tags_json),
-      sortOrder: row.sort_order ?? 0,
-      isActive: row.is_active !== 0,
-    }));
-
-    return json({ examples });
+    return onRequestGet(context);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error('[admin/custom-orders/examples] save failed', detail);
@@ -171,7 +174,7 @@ const parseTags = (value?: string | null): string[] => {
       return parsed.map((tag) => String(tag).trim()).filter(Boolean);
     }
   } catch {
-    // ignore JSON parse errors
+    // ignore
   }
   return [];
 };
@@ -188,4 +191,3 @@ const normalizeTags = (value: unknown): string[] => {
   }
   return [];
 };
-

@@ -1,5 +1,6 @@
 type Env = {
   IMAGES_BUCKET?: R2Bucket;
+  IMAGE_STORAGE_PREFIX?: string;
 };
 
 const json = (data: unknown, status = 200) =>
@@ -16,10 +17,15 @@ const guessContentType = (key: string) => {
   return undefined;
 };
 
+const normalizePrefix = (value?: string): string => {
+  const trimmed = (value || 'site').trim().replace(/^\/+/, '').replace(/\/+$/, '');
+  return trimmed || 'site';
+};
+
 export async function onRequest(context: {
   request: Request;
   env: Env;
-  next: () => Promise<Response>;
+  next: (input?: Request | string) => Promise<Response>;
 }): Promise<Response> {
   const url = new URL(context.request.url);
   if (!url.pathname.startsWith('/images/')) {
@@ -28,32 +34,42 @@ export async function onRequest(context: {
 
   const method = context.request.method.toUpperCase();
   if (method !== 'GET' && method !== 'HEAD') {
-    return json({ ok: false, code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed' }, 405);
+    return json({ ok: false, code: 'METHOD_NOT_ALLOWED' }, 405);
   }
 
-  const storageKey = url.pathname.replace(/^\/images\//, '');
+  const storageKey = decodeURIComponent(url.pathname.replace(/^\/images\//, ''));
   if (!storageKey) {
-    return json({ ok: false, code: 'MISSING_KEY', message: 'Image key is required' }, 400);
+    return json({ ok: false, code: 'NOT_FOUND' }, 404);
   }
 
-  if (!storageKey.startsWith('doverdesign/')) {
-    return context.next();
+  const requiredPrefix = `${normalizePrefix(context.env.IMAGE_STORAGE_PREFIX)}/`;
+  if (!storageKey.startsWith(requiredPrefix)) {
+    return json({ ok: false, code: 'NOT_FOUND' }, 404);
   }
 
   if (!context.env.IMAGES_BUCKET) {
     console.error('[images/middleware] missing IMAGES_BUCKET binding');
-    return json({ ok: false, code: 'MISSING_R2', message: 'Missing IMAGES_BUCKET binding' }, 500);
+    return json({ ok: false, code: 'MISSING_R2' }, 500);
   }
 
   try {
     const object = await context.env.IMAGES_BUCKET.get(storageKey);
     if (!object) {
-      return json({ ok: false, code: 'NOT_FOUND', message: 'Image not found' }, 404);
+      return json({ ok: false, code: 'NOT_FOUND' }, 404);
     }
 
     const headers = new Headers();
-    const contentType = object.httpMetadata?.contentType || guessContentType(storageKey);
+
+    if (typeof (object as any).writeHttpMetadata === 'function') {
+      (object as any).writeHttpMetadata(headers);
+    }
+
+    const contentType = headers.get('Content-Type') || object.httpMetadata?.contentType || guessContentType(storageKey);
     if (contentType) headers.set('Content-Type', contentType);
+
+    const etag = (object as any).httpEtag || object.etag;
+    if (etag) headers.set('ETag', etag);
+
     headers.set('Cache-Control', 'public, max-age=31536000, immutable');
 
     return new Response(method === 'HEAD' ? null : object.body, {
@@ -61,7 +77,7 @@ export async function onRequest(context: {
       headers,
     });
   } catch (error) {
-    console.error('[images/middleware] failed', error);
-    return json({ ok: false, code: 'FETCH_FAILED', message: 'Image fetch failed' }, 500);
+    console.error('[images/middleware] fetch failed', error);
+    return json({ ok: false, code: 'NOT_FOUND' }, 404);
   }
 }

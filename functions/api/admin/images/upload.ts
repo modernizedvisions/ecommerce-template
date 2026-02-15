@@ -1,23 +1,40 @@
-import { buildImagesPublicUrl, ensureImagesSchema } from '../../lib/images';
+import {
+  ALLOWED_IMAGE_CONTENT_TYPES,
+  MAX_UPLOAD_BYTES,
+  buildImageStorageKey,
+  buildImagesPublicUrl,
+  coerceImageScope,
+  normalizeImageUrl,
+} from '../../_lib/images';
 import { requireAdmin } from '../../_lib/adminAuth';
 
-type Env = {
-  IMAGES_BUCKET?: R2Bucket;
-  PUBLIC_IMAGES_BASE_URL?: string;
-  IMAGE_DEBUG?: string;
-  DB?: {
-    prepare(query: string): {
-      bind(...values: unknown[]): any;
-      run(): Promise<{ success: boolean; error?: string }>;
-    };
-  };
+type D1PreparedStatement = {
+  bind(...values: unknown[]): D1PreparedStatement;
+  run(): Promise<{ success: boolean; error?: string }>;
+  first<T>(): Promise<T | null>;
 };
 
-const BUILD_FINGERPRINT = 'upload-fingerprint-2025-12-21-a';
-const DEFAULT_SCOPE = 'products';
-const VALID_SCOPES = new Set(['products', 'gallery', 'home', 'categories', 'custom-orders']);
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+type D1Database = {
+  prepare(query: string): D1PreparedStatement;
+};
+
+type Env = {
+  DB?: D1Database;
+  IMAGES_BUCKET?: R2Bucket;
+  IMAGE_DEBUG?: string;
+  IMAGE_STORAGE_PREFIX?: string;
+};
+
+type ExistingImage = {
+  id: string;
+  storage_key: string | null;
+};
+
+const json = (data: unknown, status = 200, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json', ...headers },
+  });
 
 const corsHeaders = (request?: Request | null) => {
   const origin = request?.headers.get('Origin') || '';
@@ -29,328 +46,212 @@ const corsHeaders = (request?: Request | null) => {
         }
       : {}),
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Upload-Request-Id, X-Admin-Password',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Upload-Request-Id',
   };
 };
 
-const json = (data: unknown, status = 200, headers: Record<string, string> = {}) =>
-  new Response(JSON.stringify(data), {
-    status,
-    headers: { 'content-type': 'application/json', ...headers },
-  });
-
-const withFingerprint = <T extends Record<string, unknown>>(data: T) => ({
-  ...data,
-  fingerprint: BUILD_FINGERPRINT,
-});
-
-const extensionForMime = (mime: string) => {
-  switch (mime) {
-    case 'image/jpeg':
-      return 'jpg';
-    case 'image/png':
-      return 'png';
-    case 'image/webp':
-      return 'webp';
-    default:
-      return 'bin';
-  }
+const normalizeOptionalString = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 };
 
-const resolveScope = (request: Request) => {
-  const url = new URL(request.url);
-  const scope = (url.searchParams.get('scope') || '').toLowerCase();
-  return VALID_SCOPES.has(scope) ? scope : DEFAULT_SCOPE;
+const normalizeSortOrder = (value: unknown): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.floor(parsed));
 };
 
 export async function onRequestOptions(context: { request: Request }): Promise<Response> {
-  const { request } = context;
-  console.log('[images/upload] handler', {
-    handler: 'OPTIONS',
-    method: request.method,
-    url: request.url,
-    contentType: request.headers.get('content-type') || '',
-    requestId: request.headers.get('x-upload-request-id'),
-    scope: resolveScope(request),
-  });
   return new Response(null, {
     status: 204,
-    headers: {
-      ...corsHeaders(context.request),
-      'X-Upload-Fingerprint': BUILD_FINGERPRINT,
-    },
+    headers: corsHeaders(context.request),
   });
-}
-
-export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
-  const { request } = context;
-  const unauthorized = await requireAdmin(request, context.env);
-  if (unauthorized) return unauthorized;
-  console.log('[images/upload] handler', {
-    handler: 'GET',
-    method: request.method,
-    url: request.url,
-    contentType: request.headers.get('content-type') || '',
-    userAgent: request.headers.get('user-agent') || '',
-    referer: request.headers.get('referer') || '',
-    requestId: request.headers.get('x-upload-request-id'),
-    scope: resolveScope(request),
-  });
-  return json(
-    withFingerprint({
-      ok: false,
-      code: 'METHOD_NOT_ALLOWED',
-      message: 'Method not allowed. Use POST.',
-      method: request.method,
-      path: request.url,
-    }),
-    405,
-    corsHeaders(request)
-  );
 }
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
-  const contentType = request.headers.get('content-type') || '';
-  const contentLength = request.headers.get('content-length') || '';
-  const scope = resolveScope(request);
-  const url = new URL(request.url);
-  const rid = url.searchParams.get('rid') || '';
 
-  console.log('[images/upload] handler', {
-    handler: 'POST',
-    method: request.method,
-    url: request.url,
-    contentType,
-    requestId: request.headers.get('x-upload-request-id'),
-    scope,
-  });
+  const unauthorized = await requireAdmin(request, env as any);
+  if (unauthorized) return unauthorized;
+
+  if (!env.IMAGES_BUCKET) {
+    return json({ ok: false, code: 'MISSING_R2' }, 500, corsHeaders(request));
+  }
+  if (!env.DB) {
+    return json({ ok: false, code: 'DB_ERROR', detail: 'Missing DB binding' }, 500, corsHeaders(request));
+  }
+
+  const contentType = request.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().includes('multipart/form-data')) {
+    return json({ ok: false, code: 'BAD_MULTIPART' }, 400, corsHeaders(request));
+  }
+
+  const contentLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > MAX_UPLOAD_BYTES) {
+    return json({ ok: false, code: 'UPLOAD_TOO_LARGE' }, 413, corsHeaders(request));
+  }
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return json({ ok: false, code: 'BAD_MULTIPART' }, 400, corsHeaders(request));
+  }
+
+  let file: File | null = null;
+  const direct = form.get('file');
+  if (direct instanceof File) {
+    file = direct;
+  } else {
+    const fallback = form.getAll('files[]').find((entry) => entry instanceof File);
+    if (fallback instanceof File) file = fallback;
+  }
+
+  if (!file) {
+    return json({ ok: false, code: 'BAD_MULTIPART', detail: 'Missing file field' }, 400, corsHeaders(request));
+  }
+
+  if (!ALLOWED_IMAGE_CONTENT_TYPES.has(file.type)) {
+    return json({ ok: false, code: 'UNSUPPORTED_TYPE' }, 415, corsHeaders(request));
+  }
+
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return json({ ok: false, code: 'UPLOAD_TOO_LARGE' }, 413, corsHeaders(request));
+  }
+
+  const url = new URL(request.url);
+  const scope = coerceImageScope(url.searchParams.get('scope'));
+
+  const requestedImageId =
+    normalizeOptionalString(url.searchParams.get('imageId')) || normalizeOptionalString(form.get('imageId'));
+
+  const entityType = normalizeOptionalString(url.searchParams.get('entityType')) || normalizeOptionalString(form.get('entityType'));
+  const entityId = normalizeOptionalString(url.searchParams.get('entityId')) || normalizeOptionalString(form.get('entityId'));
+  const kind = normalizeOptionalString(url.searchParams.get('kind')) || normalizeOptionalString(form.get('kind'));
+  const isPrimaryRaw = url.searchParams.get('isPrimary') || (form.get('isPrimary') as string | null);
+  const sortOrderRaw = url.searchParams.get('sortOrder') || (form.get('sortOrder') as string | null);
+  const isPrimary = isPrimaryRaw === '1' || isPrimaryRaw === 'true' ? 1 : 0;
+  const sortOrder = normalizeSortOrder(sortOrderRaw);
+
+  let imageId = requestedImageId || crypto.randomUUID();
+  let storageKey: string;
+  let existing: ExistingImage | null = null;
+
+  if (requestedImageId) {
+    existing = await env.DB.prepare(`SELECT id, storage_key FROM images WHERE id = ? LIMIT 1;`).bind(requestedImageId).first<ExistingImage>();
+    if (!existing?.id) {
+      return json({ ok: false, code: 'BAD_INPUT', detail: 'Unknown imageId' }, 400, corsHeaders(request));
+    }
+    storageKey = existing.storage_key || buildImageStorageKey(env, scope, file.type);
+  } else {
+    storageKey = buildImageStorageKey(env, scope, file.type);
+  }
 
   try {
-    const unauthorized = await requireAdmin(request, env);
-    if (unauthorized) return unauthorized;
-
-    if (!env.IMAGES_BUCKET) {
-      return json(
-        withFingerprint({
-          ok: false,
-          code: 'MISSING_R2',
-          message: 'Missing IMAGES_BUCKET binding',
-          rid,
-          scope,
-          debug: env.IMAGE_DEBUG === '1'
-            ? {
-                envPresent: {
-                  IMAGES_BUCKET: !!env.IMAGES_BUCKET,
-                  PUBLIC_IMAGES_BASE_URL: !!env.PUBLIC_IMAGES_BASE_URL,
-                },
-              }
-            : undefined,
-        }),
-        500,
-        corsHeaders(request)
-      );
-    }
-
-    if (!contentType.toLowerCase().includes('multipart/form-data')) {
-      return json(
-        withFingerprint({
-          ok: false,
-          code: 'BAD_MULTIPART',
-          message: 'Expected multipart/form-data upload',
-          rid,
-          scope,
-        }),
-        400,
-        corsHeaders(request)
-      );
-    }
-
-    const lengthValue = Number(contentLength);
-    if (Number.isFinite(lengthValue) && lengthValue > MAX_UPLOAD_BYTES) {
-      return json(
-        withFingerprint({
-          ok: false,
-          code: 'UPLOAD_TOO_LARGE',
-          message: 'Upload too large',
-          rid,
-          scope,
-        }),
-        413,
-        corsHeaders(request)
-      );
-    }
-
-    let form: FormData;
-    try {
-      form = await request.formData();
-    } catch (err) {
-      console.error('[images/upload] Failed to parse form data', err);
-      return json(
-        withFingerprint({
-          ok: false,
-          code: 'BAD_MULTIPART',
-          message: 'Invalid form data',
-          rid,
-          scope,
-        }),
-        400,
-        corsHeaders(request)
-      );
-    }
-
-    let file = form.get('file');
-    if (!file) {
-      const files = form.getAll('files[]');
-      file = files.find((entry) => entry instanceof File) || null;
-    }
-
-    if (!file || !(file instanceof File)) {
-      return json(
-        withFingerprint({
-          ok: false,
-          code: 'BAD_MULTIPART',
-          message: 'Missing file field',
-          rid,
-          scope,
-        }),
-        400,
-        corsHeaders(request)
-      );
-    }
-
-    if (!ALLOWED_MIME_TYPES.has(file.type)) {
-      return json(
-        withFingerprint({
-          ok: false,
-          code: 'UNSUPPORTED_TYPE',
-          message: 'Unsupported image type',
-          rid,
-          scope,
-        }),
-        415,
-        corsHeaders(request)
-      );
-    }
-
-    if (file.size > MAX_UPLOAD_BYTES) {
-      return json(
-        withFingerprint({
-          ok: false,
-          code: 'UPLOAD_TOO_LARGE',
-          message: 'Upload too large',
-          rid,
-          scope,
-        }),
-        413,
-        corsHeaders(request)
-      );
-    }
-
-    console.log('[images/upload] file received', {
-      name: file.name,
-      type: file.type,
-      size: file.size,
+    await env.IMAGES_BUCKET.put(storageKey, file.stream(), {
+      httpMetadata: { contentType: file.type },
+      customMetadata: { originalName: file.name },
     });
-
-    const now = new Date();
-    const year = now.getUTCFullYear();
-    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-    const ext = extensionForMime(file.type);
-    const key = `doverdesign/${scope}/${year}/${month}/${crypto.randomUUID()}.${ext}`;
-
-    try {
-      await env.IMAGES_BUCKET.put(key, file.stream(), {
-        httpMetadata: { contentType: file.type },
-        customMetadata: { originalName: file.name },
-      });
-    } catch (err) {
-      console.error('[images/upload] R2 upload failed', err);
-      return json(
-        withFingerprint({
-          ok: false,
-          code: 'R2_PUT_FAILED',
-          message: 'Image upload failed',
-          rid,
-          scope,
-        }),
-        500,
-        corsHeaders(request)
-      );
-    }
-
-    const publicUrl = buildImagesPublicUrl(key, request, env);
-    let imageId: string | null = null;
-    let warning: string | undefined;
-
-    if (env.DB) {
-      try {
-        await ensureImagesSchema(env.DB);
-        imageId = crypto.randomUUID();
-        const entityType = url.searchParams.get('entityType') || (form.get('entityType') as string | null);
-        const entityId = url.searchParams.get('entityId') || (form.get('entityId') as string | null);
-        const kind = url.searchParams.get('kind') || (form.get('kind') as string | null);
-        const isPrimaryRaw = url.searchParams.get('isPrimary') || (form.get('isPrimary') as string | null);
-        const sortOrderRaw = url.searchParams.get('sortOrder') || (form.get('sortOrder') as string | null);
-        const isPrimary = isPrimaryRaw === '1' || isPrimaryRaw === 'true' ? 1 : 0;
-        const sortOrder = Number.isFinite(Number(sortOrderRaw)) ? Number(sortOrderRaw) : 0;
-
-        await env.DB.prepare(
-          `INSERT INTO images (
-            id, storage_provider, storage_key, public_url, content_type, size_bytes,
-            original_filename, entity_type, entity_id, kind, is_primary, sort_order, upload_request_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
-        )
-          .bind(
-            imageId,
-            'r2',
-            key,
-            publicUrl,
-            file.type,
-            file.size,
-            file.name,
-            entityType || null,
-            entityId || null,
-            kind || null,
-            isPrimary,
-            sortOrder,
-            rid || request.headers.get('x-upload-request-id') || null
-          )
-          .run();
-      } catch (err) {
-        console.error('[images/upload] D1 insert failed', err);
-        warning = 'D1_INSERT_FAILED';
-        imageId = null;
-      }
-    }
-
-    return json(
-      withFingerprint({
-        ok: true,
-        image: {
-          id: imageId,
-          storageKey: key,
-          publicUrl,
-        },
-        warning,
-      }),
-      200,
-      corsHeaders(request)
-    );
-  } catch (err) {
-    const details = err instanceof Error ? `${err.message}\n${err.stack || ''}` : String(err);
-    console.error('[images/upload] Unexpected error', details);
-    return json(
-      withFingerprint({
-        ok: false,
-        code: 'UPLOAD_FAILED',
-        message: 'Image upload failed',
-        rid,
-        scope,
-        debug: env.IMAGE_DEBUG === '1' ? { details } : undefined,
-      }),
-      500,
-      corsHeaders(request)
-    );
+  } catch (error) {
+    console.error('[admin/images/upload] R2 put failed', error);
+    return json({ ok: false, code: 'R2_PUT_FAILED' }, 500, corsHeaders(request));
   }
+
+  const publicUrl = normalizeImageUrl(buildImagesPublicUrl(storageKey));
+  const nowIso = new Date().toISOString();
+
+  if (existing?.id) {
+    const updated = await env.DB.prepare(
+      `UPDATE images
+       SET storage_provider = 'r2',
+           storage_key = ?,
+           public_url = ?,
+           content_type = ?,
+           size_bytes = ?,
+           original_filename = ?,
+           entity_type = ?,
+           entity_id = ?,
+           kind = ?,
+           is_primary = ?,
+           sort_order = ?
+       WHERE id = ?;`
+    )
+      .bind(
+        storageKey,
+        publicUrl,
+        file.type,
+        file.size,
+        file.name,
+        entityType,
+        entityId,
+        kind,
+        isPrimary,
+        sortOrder,
+        imageId
+      )
+      .run();
+
+    if (!updated.success) {
+      return json({ ok: false, code: 'DB_ERROR', detail: updated.error || 'Update failed' }, 500, corsHeaders(request));
+    }
+  } else {
+    const inserted = await env.DB.prepare(
+      `INSERT INTO images (
+          id,
+          storage_provider,
+          storage_key,
+          public_url,
+          content_type,
+          size_bytes,
+          original_filename,
+          entity_type,
+          entity_id,
+          kind,
+          is_primary,
+          sort_order,
+          created_at
+        )
+        VALUES (?, 'r2', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
+    )
+      .bind(
+        imageId,
+        storageKey,
+        publicUrl,
+        file.type,
+        file.size,
+        file.name,
+        entityType,
+        entityId,
+        kind,
+        isPrimary,
+        sortOrder,
+        nowIso
+      )
+      .run();
+
+    if (!inserted.success) {
+      return json({ ok: false, code: 'DB_ERROR', detail: inserted.error || 'Insert failed' }, 500, corsHeaders(request));
+    }
+  }
+
+  return json(
+    {
+      ok: true,
+      image: {
+        id: imageId,
+        storageKey,
+        publicUrl,
+      },
+    },
+    200,
+    corsHeaders(request)
+  );
+}
+
+export async function onRequest(context: { request: Request; env: Env }): Promise<Response> {
+  const method = context.request.method.toUpperCase();
+  if (method === 'OPTIONS') return onRequestOptions(context);
+  if (method === 'POST') return onRequestPost(context);
+  return json({ ok: false, code: 'METHOD_NOT_ALLOWED' }, 405, corsHeaders(context.request));
 }

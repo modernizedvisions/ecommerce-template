@@ -1,0 +1,14 @@
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1m[admin auth login] server error Error: Invalid ADMIN_PASSWORD_ITERS[0m
+
+      at parsePositiveInt (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/functions/api/_lib/adminAuth.ts:92:11)
+      at getPasswordConfig (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/functions/api/_lib/adminAuth.ts:100:22)
+      at pbkdf2Verify (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/functions/api/_lib/adminAuth.ts:124:46)
+      at onRequestPost (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/functions/api/admin/auth/login.ts:36:27)
+      at async Object.next (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/tmp/pages-86Eayg/functionsWorker-0.9519374351932702.mjs/file:/C:/Users/Jacob%2520Baumeister/AppData/Roaming/npm/node_modules/wrangler/templates/pages-template-worker.ts:161:22)
+      at async Object.next (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/tmp/pages-86Eayg/functionsWorker-0.9519374351932702.mjs/file:/C:/Users/Jacob%2520Baumeister/AppData/Roaming/npm/node_modules/wrangler/templates/pages-template-worker.ts:161:22)
+      at async next (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/tmp/pages-86Eayg/functionsWorker-0.9519374351932702.mjs/file:/C:/Users/Jacob%2520Baumeister/AppData/Roaming/npm/node_modules/wrangler/templates/pages-template-worker.ts:161:22)
+      at async Object.fetch (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/tmp/pages-86Eayg/functionsWorker-0.9519374351932702.mjs/file:/C:/Users/Jacob%2520Baumeister/AppData/Roaming/npm/node_modules/wrangler/templates/pages-template-worker.ts:180:11)
+      at async jsonError (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/tmp/pages-86Eayg/functionsWorker-0.9519374351932702.mjs/file:/C:/Users/Jacob%2520Baumeister/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts:22:10)
+      at async drainBody (file:///D:/ModernizedVisions/ECOM%20TEMPLATE/ecommerce-template-main/ecommerce-template-main/.wrangler/tmp/pages-86Eayg/functionsWorker-0.9519374351932702.mjs/file:/C:/Users/Jacob%2520Baumeister/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts:5:10)
+
+

@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS products (
   category TEXT,
   image_url TEXT,
   image_urls_json TEXT,
+  primary_image_id TEXT,
+  image_ids_json TEXT,
   is_active INTEGER DEFAULT 1,
   is_one_off INTEGER DEFAULT 1,
   is_sold INTEGER DEFAULT 0,
@@ -44,6 +46,28 @@ CREATE TABLE IF NOT EXISTS categories (
 
 CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
 CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
+
+-- Canonical image metadata
+CREATE TABLE IF NOT EXISTS images (
+  id TEXT PRIMARY KEY,
+  storage_provider TEXT NOT NULL DEFAULT 'r2',
+  storage_key TEXT NOT NULL,
+  public_url TEXT,
+  content_type TEXT,
+  size_bytes INTEGER,
+  original_filename TEXT,
+  entity_type TEXT,
+  entity_id TEXT,
+  kind TEXT,
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_images_storage_key ON images(storage_key);
+CREATE INDEX IF NOT EXISTS idx_images_entity ON images(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_images_kind ON images(kind);
+CREATE INDEX IF NOT EXISTS idx_images_created_at ON images(created_at);
 
 -- Orders
 -- Canonical orders schema for fresh DB bootstraps; incremental upgrades are handled by migrations.
@@ -141,6 +165,8 @@ CREATE TABLE IF NOT EXISTS custom_orders (
   customer_email TEXT,
   description TEXT,
   image_url TEXT,
+  image_id TEXT,
+  image_storage_key TEXT,
   amount INTEGER,
   shipping_cents INTEGER NOT NULL DEFAULT 0,
   message_id TEXT,
@@ -210,6 +236,7 @@ CREATE TABLE IF NOT EXISTS messages (
   email TEXT,
   message TEXT,
   image_url TEXT,
+  image_id TEXT,
   type TEXT NOT NULL DEFAULT 'message',
   category_id TEXT,
   category_name TEXT,
@@ -226,6 +253,7 @@ CREATE TABLE IF NOT EXISTS gallery_images (
   id TEXT PRIMARY KEY,
   url TEXT NOT NULL,
   image_url TEXT,
+  image_id TEXT,
   alt_text TEXT,
   hidden INTEGER NOT NULL DEFAULT 0,
   is_active INTEGER DEFAULT 1,
@@ -244,6 +272,7 @@ CREATE TABLE IF NOT EXISTS site_content (
 CREATE TABLE IF NOT EXISTS custom_order_examples (
   id TEXT PRIMARY KEY,
   image_url TEXT NOT NULL,
+  image_id TEXT,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
   tags_json TEXT NOT NULL DEFAULT '[]',
@@ -263,4 +292,3 @@ VALUES ('other-items', 'Other Items', 'other-items', 1);
 
 INSERT OR IGNORE INTO site_content (key, json)
 VALUES ('home', '{}');
-
