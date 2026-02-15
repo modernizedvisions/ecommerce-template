@@ -7,3 +7,8 @@ database_name = "ecommerce-template"
 database_id = "ba2a062b-f334-4c6e-ba1e-0e6cd14b3a63"
 preview_database_id = "ba2a062b-f334-4c6e-ba1e-0e6cd14b3a63"
 migrations_dir = "db/migrations"
+
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "ecommerce-template"
+preview_bucket_name = "ecommerce-template"
