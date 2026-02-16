@@ -24,6 +24,8 @@ import { AdminCustomOrdersTab } from '../components/admin/AdminCustomOrdersTab';
 import { AdminCustomOrderExamplesTab } from '../components/admin/AdminCustomOrderExamplesTab';
 import { OrderDetailsModal } from '../components/admin/OrderDetailsModal';
 import { AdminPromotionsTab } from '../components/admin/AdminPromotionsTab';
+import { AdminShippingSettingsTab } from '../components/admin/AdminShippingSettingsTab';
+import { ShippingLabelsModal } from '../components/admin/ShippingLabelsModal';
 import { toast } from 'sonner';
 import {
   getAdminCustomOrders,
@@ -138,7 +140,7 @@ const AdminTabBadge = ({ count, isActive }: AdminTabBadgeProps) => {
   );
 };
 
-type AdminTabKey = 'orders' | 'shop' | 'messages' | 'customOrders' | 'images' | 'sold' | 'promotions';
+type AdminTabKey = 'orders' | 'shop' | 'messages' | 'customOrders' | 'images' | 'sold' | 'promotions' | 'settings';
 
 const ADMIN_TAB_TO_PATH: Record<AdminTabKey, string> = {
   orders: '/admin/customers',
@@ -148,6 +150,7 @@ const ADMIN_TAB_TO_PATH: Record<AdminTabKey, string> = {
   images: '/admin/images',
   sold: '/admin/sold',
   promotions: '/admin/promotions',
+  settings: '/admin/settings',
 };
 
 const ADMIN_TABS: Array<{ key: AdminTabKey; label: string; badge?: number }> = [
@@ -157,6 +160,7 @@ const ADMIN_TABS: Array<{ key: AdminTabKey; label: string; badge?: number }> = [
   { key: 'promotions', label: 'Promotions' },
   { key: 'customOrders', label: 'Custom Orders' },
   { key: 'images', label: 'Images' },
+  { key: 'settings', label: 'Settings' },
   { key: 'sold', label: 'Sold Products' },
 ];
 
@@ -167,6 +171,7 @@ const resolveTabFromPath = (pathname: string): AdminTabKey => {
   if (pathname.startsWith('/admin/images')) return 'images';
   if (pathname.startsWith('/admin/sold')) return 'sold';
   if (pathname.startsWith('/admin/promotions')) return 'promotions';
+  if (pathname.startsWith('/admin/settings')) return 'settings';
   if (pathname.startsWith('/admin/customers') || pathname.startsWith('/admin/orders')) return 'orders';
   return 'orders';
 };
@@ -181,6 +186,7 @@ export function AdminPage() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
+  const [shippingModalOrder, setShippingModalOrder] = useState<AdminOrder | null>(null);
   const [soldProducts, setSoldProducts] = useState<Product[]>([]);
   const [adminProducts, setAdminProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -375,6 +381,15 @@ export function AdminPage() {
     setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, isSeen: true } : o)));
     setUnseenOrders((prev) => Math.max(0, prev - 1));
     void markOrderSeen(order.id);
+  };
+
+  const openShippingModal = (order: AdminOrder) => {
+    setShippingModalOrder(order);
+  };
+
+  const openShippingSettings = () => {
+    setShippingModalOrder(null);
+    navigate(ADMIN_TAB_TO_PATH.settings);
   };
 
   const markOrderSeen = async (orderId: string) => {
@@ -1165,6 +1180,7 @@ export function AdminPage() {
             filteredOrders={filteredOrders}
             onSearchChange={setSearchQuery}
             onSelectOrder={handleSelectOrder}
+            onOpenShipping={openShippingModal}
             loading={isLoadingOrders}
             error={ordersError}
           />
@@ -1215,6 +1231,8 @@ export function AdminPage() {
         )}
 
         {activeTab === 'promotions' && <AdminPromotionsTab />}
+
+        {activeTab === 'settings' && <AdminShippingSettingsTab />}
 
         {activeTab === 'customOrders' && (
           <AdminCustomOrdersTab
@@ -1365,8 +1383,20 @@ export function AdminPage() {
           open={!!selectedOrder}
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
+          onOpenShippingLabels={(order) => {
+            setSelectedOrder(null);
+            openShippingModal(order);
+          }}
         />
         )}
+      {shippingModalOrder && (
+        <ShippingLabelsModal
+          open={!!shippingModalOrder}
+          order={shippingModalOrder}
+          onClose={() => setShippingModalOrder(null)}
+          onOpenSettings={openShippingSettings}
+        />
+      )}
     </>
   );
 }

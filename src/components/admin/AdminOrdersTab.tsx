@@ -8,11 +8,20 @@ export interface AdminOrdersTabProps {
   filteredOrders: AdminOrder[];
   onSearchChange: (value: string) => void;
   onSelectOrder: (order: AdminOrder) => void;
+  onOpenShipping: (order: AdminOrder) => void;
   loading?: boolean;
   error?: string | null;
 }
 
-export function AdminOrdersTab({ searchQuery, filteredOrders, onSearchChange, onSelectOrder, loading, error }: AdminOrdersTabProps) {
+export function AdminOrdersTab({
+  searchQuery,
+  filteredOrders,
+  onSearchChange,
+  onSelectOrder,
+  onOpenShipping,
+  loading,
+  error,
+}: AdminOrdersTabProps) {
   return (
     <div className="lux-card p-6">
       <AdminSectionHeader
@@ -65,13 +74,22 @@ export function AdminOrdersTab({ searchQuery, filteredOrders, onSearchChange, on
                       ${(((order.amountTotalCents ?? order.totalCents) || 0) / 100).toFixed(2)}
                     </td>
                     <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => onSelectOrder(order)}
-                        className="lux-button--ghost px-3 py-1 text-[10px]"
-                      >
-                        View
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onSelectOrder(order)}
+                          className="lux-button--ghost px-3 py-1 text-[10px]"
+                        >
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onOpenShipping(order)}
+                          className="lux-button--ghost px-3 py-1 text-[10px]"
+                        >
+                          Shipping
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -88,6 +106,7 @@ export function AdminOrdersTab({ searchQuery, filteredOrders, onSearchChange, on
                     <th className="px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Customer</th>
                     <th className="px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Items</th>
                     <th className="px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Total</th>
+                    <th className="px-6 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Shipping</th>
                     <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Actions</th>
                   </tr>
                 </thead>
@@ -112,6 +131,15 @@ export function AdminOrdersTab({ searchQuery, filteredOrders, onSearchChange, on
                       <td className="px-6 py-4 text-sm text-charcoal">{order.items?.length || 0} items</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-charcoal">
                         ${(((order.amountTotalCents ?? order.totalCents) || 0) / 100).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => onOpenShipping(order)}
+                          className="lux-button--ghost px-3 py-1 text-[10px]"
+                        >
+                          Manage
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <button

@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { AdminOrder } from '../../lib/db/orders';
 import { formatEasternDateTime } from '../../lib/dates';
+import { adminFetchOrderShipments, type OrderShipment } from '../../lib/adminShipping';
 
 interface OrderDetailsModalProps {
   open: boolean;
   order: AdminOrder | null;
   onClose: () => void;
+  onOpenShippingLabels?: (order: AdminOrder) => void;
 }
 
 const formatCurrency = (cents: number | null | undefined, currency: string = 'usd') => {
@@ -20,7 +22,7 @@ const formatCurrency = (cents: number | null | undefined, currency: string = 'us
   }
 };
 
-export function OrderDetailsModal({ open, order, onClose }: OrderDetailsModalProps) {
+export function OrderDetailsModal({ open, order, onClose, onOpenShippingLabels }: OrderDetailsModalProps) {
   if (!open || !order) return null;
 
   const idLabel = order.displayOrderId || order.id?.slice(0, 8) || 'Order';
@@ -37,6 +39,9 @@ export function OrderDetailsModal({ open, order, onClose }: OrderDetailsModalPro
   const hasShipping = !!shipping;
 
   const [itemImages, setItemImages] = useState<Record<string, string>>({});
+  const [shipments, setShipments] = useState<OrderShipment[]>([]);
+  const [shipmentsLoading, setShipmentsLoading] = useState(false);
+  const [shipmentsError, setShipmentsError] = useState<string>('');
 
   const CUSTOM_ORDER_PREFIXES = ['custom_order:', 'custom-order:', 'custom order:'];
 
@@ -104,6 +109,32 @@ export function OrderDetailsModal({ open, order, onClose }: OrderDetailsModalPro
     fetchImages();
   }, [rawItems, itemImages]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadShipments = async () => {
+      if (!order?.id) return;
+      setShipmentsLoading(true);
+      setShipmentsError('');
+      try {
+        const data = await adminFetchOrderShipments(order.id);
+        if (cancelled) return;
+        setShipments(data.shipments || []);
+      } catch (error) {
+        if (cancelled) return;
+        setShipmentsError(error instanceof Error ? error.message : 'Failed to load shipping labels.');
+        setShipments([]);
+      } finally {
+        if (!cancelled) {
+          setShipmentsLoading(false);
+        }
+      }
+    };
+    void loadShipments();
+    return () => {
+      cancelled = true;
+    };
+  }, [order?.id]);
+
   const shippingFromItems = rawItems
     .filter(isShippingItem)
     .reduce((sum, item) => sum + (item.priceCents || 0) * (item.quantity || 1), 0);
@@ -138,6 +169,9 @@ export function OrderDetailsModal({ open, order, onClose }: OrderDetailsModalPro
   const taxCents = hasCanonicalTotals ? order.amountTaxCents ?? 0 : null;
   const discountCents = hasCanonicalTotals ? order.amountDiscountCents ?? 0 : null;
   const totalCents = order.amountTotalCents ?? order.totalCents ?? 0;
+  const customerPaidShippingCents = order.amountShippingCents ?? order.shippingCents ?? 0;
+  const actualLabelTotalCents = shipments.reduce((sum, shipment) => sum + (shipment.labelCostAmountCents || 0), 0);
+  const shippingDifferenceCents = actualLabelTotalCents - customerPaidShippingCents;
 
   const formattedAddress = hasShipping
     ? [
@@ -261,6 +295,90 @@ export function OrderDetailsModal({ open, order, onClose }: OrderDetailsModalPro
                 <div className="flex items-center justify-between pt-1 border-t border-driftwood/60">
                   <span className="font-semibold text-charcoal">Total</span>
                   <span className="font-semibold text-charcoal">{formatCurrency(totalCents, currency)}</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="lux-panel p-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="lux-label text-[10px]">Shipping Labels</p>
+                <button
+                  type="button"
+                  className="lux-button--ghost px-3 py-1 text-[10px]"
+                  onClick={() => onOpenShippingLabels?.(order)}
+                >
+                  Create Shipping Labels
+                </button>
+              </div>
+              {shipmentsLoading ? (
+                <div className="text-sm text-charcoal/60">Loading shipping labels...</div>
+              ) : shipmentsError ? (
+                <div className="text-sm text-rose-700">{shipmentsError}</div>
+              ) : shipments.length === 0 ? (
+                <div className="text-sm text-charcoal/60">No labels yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {shipments.map((shipment) => (
+                    <div key={shipment.id} className="rounded-shell border border-driftwood/60 bg-white/80 p-3 text-sm">
+                      <div className="font-medium text-charcoal">
+                        Parcel #{shipment.parcelIndex} {shipment.carrier ? `- ${shipment.carrier}` : ''}{' '}
+                        {shipment.service ? shipment.service : ''}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-charcoal/70">
+                        <span className="inline-flex items-center gap-2">
+                          Tracking: {shipment.trackingNumber || '-'}
+                          {shipment.trackingNumber && (
+                            <button
+                              type="button"
+                              className="lux-button--ghost px-2 py-1 text-[10px]"
+                              onClick={() => void navigator.clipboard?.writeText(shipment.trackingNumber || '')}
+                            >
+                              Copy
+                            </button>
+                          )}
+                        </span>
+                        {shipment.labelCostAmountCents !== null && (
+                          <span>
+                            Cost:{' '}
+                            {formatCurrency(
+                              shipment.labelCostAmountCents,
+                              shipment.labelCurrency || order.currency || 'USD'
+                            )}
+                          </span>
+                        )}
+                        {shipment.labelUrl && (
+                          <a
+                            href={shipment.labelUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="lux-button--ghost px-2 py-1 text-[10px]"
+                          >
+                            Download PDF
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+                <div className="rounded-shell bg-linen/70 px-3 py-2">
+                  <div className="text-charcoal/70">Customer Paid Shipping</div>
+                  <div className="font-semibold text-charcoal">
+                    {formatCurrency(customerPaidShippingCents, order.currency || 'USD')}
+                  </div>
+                </div>
+                <div className="rounded-shell bg-linen/70 px-3 py-2">
+                  <div className="text-charcoal/70">Actual Label Total</div>
+                  <div className="font-semibold text-charcoal">
+                    {formatCurrency(actualLabelTotalCents, order.currency || 'USD')}
+                  </div>
+                </div>
+                <div className="rounded-shell bg-linen/70 px-3 py-2">
+                  <div className="text-charcoal/70">Difference (Actual - Paid)</div>
+                  <div className={`font-semibold ${shippingDifferenceCents > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {formatCurrency(shippingDifferenceCents, order.currency || 'USD')}
+                  </div>
                 </div>
               </div>
             </section>
