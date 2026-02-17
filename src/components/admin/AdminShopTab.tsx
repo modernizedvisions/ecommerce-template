@@ -229,6 +229,12 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
   const editOverrideAmountInvalid =
     !!editProductForm?.shippingOverrideEnabled &&
     parseCurrencyToCents(editProductForm.shippingOverrideAmount) === null;
+  const createCategoryShippingInlineText = productForm.category
+    ? `${productForm.category} Shipping: ${formatPriceDisplay(createSelectedCategory?.shippingCents ?? 0)}`
+    : 'Category shipping: —';
+  const editCategoryShippingInlineText = editProductForm?.category
+    ? `${editProductForm.category} Shipping: ${formatPriceDisplay(editSelectedCategory?.shippingCents ?? 0)}`
+    : 'Category shipping: —';
 
   useEffect(() => {
     if (!isDev) return;
@@ -421,7 +427,7 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-4 items-center">
+                  <div className="flex flex-col gap-3">
                     <ToggleSwitch
                       label="One-off piece"
                       checked={productForm.isOneOff}
@@ -432,6 +438,43 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
                       checked={productForm.isActive}
                       onChange={(val) => onProductFormChange('isActive', val)}
                     />
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ToggleSwitch
+                          label="Override shipping"
+                          checked={!!productForm.shippingOverrideEnabled}
+                          onChange={(val) => onProductFormChange('shippingOverrideEnabled', val)}
+                        />
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-charcoal/55 w-full sm:w-auto sm:ml-auto">
+                          {createCategoryShippingInlineText}
+                        </span>
+                      </div>
+                      {productForm.shippingOverrideEnabled && (
+                        <div className="space-y-1 sm:max-w-[180px]">
+                          <label className="lux-label block">Override amount</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            pattern="^\\$?\\d*(\\.\\d{0,2})?$"
+                            value={formatCurrencyDisplay(productForm.shippingOverrideAmount)}
+                            onChange={(e) =>
+                              onProductFormChange('shippingOverrideAmount', sanitizeCurrencyInput(e.target.value))
+                            }
+                            onBlur={(e) =>
+                              onProductFormChange('shippingOverrideAmount', formatCurrencyValue(e.target.value))
+                            }
+                            placeholder="0.00"
+                            className="lux-input"
+                          />
+                          {createOverrideAmountInvalid && (
+                            <p className="text-xs text-rose-700">Enter a valid amount (0 or more).</p>
+                          )}
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-charcoal/60">
+                            Replaces category/cart shipping rules.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex gap-3 pt-2 md:mt-auto">
@@ -528,45 +571,6 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
                         );
                       })
                     )}
-                  </div>
-                  <p className="mt-2 text-xs text-charcoal/70">
-                    {productForm.category
-                      ? `Category shipping: ${formatPriceDisplay(createSelectedCategory?.shippingCents ?? 0)} (${productForm.category})`
-                      : 'Category shipping: Select a category to see shipping.'}
-                  </p>
-                  <div className="mt-3 rounded-shell-lg border border-driftwood/60 bg-white/70 p-3 space-y-3">
-                    <ToggleSwitch
-                      label="Override shipping"
-                      checked={!!productForm.shippingOverrideEnabled}
-                      onChange={(val) => onProductFormChange('shippingOverrideEnabled', val)}
-                    />
-                    {productForm.shippingOverrideEnabled && (
-                      <div>
-                        <label className="lux-label mb-2 block">Override amount</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          pattern="^\\$?\\d*(\\.\\d{0,2})?$"
-                          value={formatCurrencyDisplay(productForm.shippingOverrideAmount)}
-                          onChange={(e) =>
-                            onProductFormChange('shippingOverrideAmount', sanitizeCurrencyInput(e.target.value))
-                          }
-                          onBlur={(e) =>
-                            onProductFormChange('shippingOverrideAmount', formatCurrencyValue(e.target.value))
-                          }
-                          placeholder="$0.00"
-                          className="lux-input"
-                        />
-                        {createOverrideAmountInvalid && (
-                          <p className="mt-1 text-xs text-rose-700">
-                            Enter a valid amount (0 or more).
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-charcoal/60">
-                      Override shipping replaces category/cart shipping rules.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -927,47 +931,44 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
                         checked={!!editProductForm?.isActive}
                         onChange={(val) => onEditFormChange('isActive', val)}
                       />
-                    </div>
-                  </div>
-
-                  <div className="rounded-shell-lg border border-driftwood/60 bg-white/70 p-3 space-y-3">
-                    <p className="text-xs text-charcoal/70">
-                      {editProductForm?.category
-                        ? `Category shipping: ${formatPriceDisplay(editSelectedCategory?.shippingCents ?? 0)} (${editProductForm.category})`
-                        : 'Category shipping: Select a category to see shipping.'}
-                    </p>
-                    <ToggleSwitchSmall
-                      label="Override shipping"
-                      checked={!!editProductForm?.shippingOverrideEnabled}
-                      onChange={(val) => onEditFormChange('shippingOverrideEnabled', val)}
-                    />
-                    {editProductForm?.shippingOverrideEnabled && (
-                      <div>
-                        <label className="lux-label mb-2 block">Override amount</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          pattern="^\\$?\\d*(\\.\\d{0,2})?$"
-                          value={formatCurrencyDisplay(editProductForm.shippingOverrideAmount || '')}
-                          onChange={(e) =>
-                            onEditFormChange('shippingOverrideAmount', sanitizeCurrencyInput(e.target.value))
-                          }
-                          onBlur={(e) =>
-                            onEditFormChange('shippingOverrideAmount', formatCurrencyValue(e.target.value))
-                          }
-                          placeholder="$0.00"
-                          className="lux-input text-sm"
-                        />
-                        {editOverrideAmountInvalid && (
-                          <p className="mt-1 text-xs text-rose-700">
-                            Enter a valid amount (0 or more).
-                          </p>
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ToggleSwitchSmall
+                            label="Override shipping"
+                            checked={!!editProductForm?.shippingOverrideEnabled}
+                            onChange={(val) => onEditFormChange('shippingOverrideEnabled', val)}
+                          />
+                          <span className="text-[10px] uppercase tracking-[0.18em] text-charcoal/55 w-full sm:w-auto sm:ml-auto">
+                            {editCategoryShippingInlineText}
+                          </span>
+                        </div>
+                        {editProductForm?.shippingOverrideEnabled && (
+                          <div className="space-y-1 sm:max-w-[180px]">
+                            <label className="lux-label block">Override amount</label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              pattern="^\\$?\\d*(\\.\\d{0,2})?$"
+                              value={formatCurrencyDisplay(editProductForm.shippingOverrideAmount || '')}
+                              onChange={(e) =>
+                                onEditFormChange('shippingOverrideAmount', sanitizeCurrencyInput(e.target.value))
+                              }
+                              onBlur={(e) =>
+                                onEditFormChange('shippingOverrideAmount', formatCurrencyValue(e.target.value))
+                              }
+                              placeholder="0.00"
+                              className="lux-input text-sm"
+                            />
+                            {editOverrideAmountInvalid && (
+                              <p className="text-xs text-rose-700">Enter a valid amount (0 or more).</p>
+                            )}
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-charcoal/60">
+                              Replaces category/cart shipping rules.
+                            </p>
+                          </div>
                         )}
                       </div>
-                    )}
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-charcoal/60">
-                      Override shipping replaces category/cart shipping rules.
-                    </p>
+                    </div>
                   </div>
                 </div>
 
