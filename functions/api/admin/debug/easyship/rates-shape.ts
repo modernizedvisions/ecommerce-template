@@ -187,6 +187,8 @@ export async function onRequestGet(
       firstParcelKeys: payloadShape.firstParcelKeys,
       firstParcelItemsIsArray: payloadShape.firstParcelItemsIsArray,
       firstParcelItemsLength: payloadShape.firstParcelItemsLength,
+      firstParcelFirstItemKeys: payloadShape.firstParcelFirstItemKeys,
+      firstParcelFirstItemHasCategory: payloadShape.firstParcelFirstItemHasCategory,
       bodySkeleton: payloadShape.skeleton,
     });
   } catch (error) {

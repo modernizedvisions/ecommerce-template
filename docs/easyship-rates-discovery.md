@@ -108,6 +108,7 @@ Constructed by `buildEasyshipRatesPayload(...)` in `functions/api/_lib/easyship.
       "items": [
         {
           "description": "[present]",
+          "category": "[present]",
           "quantity": "[present]",
           "actual_weight": "[present]",
           "declared_currency": "[present]",
@@ -123,6 +124,7 @@ Schema fix status:
 
 - Top-level `shipment` wrapper has been removed from `/rates` payload.
 - `parcels[0].items` is always emitted as a non-empty array.
+- Each item now includes `category` (default `fashion`) so `category`/`hs_code` conditional validation passes.
 - Debug logs/endpoint now expose `hasShipmentWrapper` to verify wrapper absence in runtime requests.
 
 ## Env Vars Actually Read
@@ -176,6 +178,7 @@ When aligning to Easyship `RateRequest`, map current model as:
   - box length/width/height (in), total_actual_weight (lb), and non-empty `items[]`
 - `items[]` from order lines (`order_items`):
   - description from product name/product id
+  - category defaults to `fashion` (v2024-09 docs example category)
   - quantity from `order_items.quantity`
   - declared value from `order_items.price_cents` (USD)
 

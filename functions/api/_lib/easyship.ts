@@ -56,6 +56,9 @@ export type EasyshipRateRequest = {
   items?: EasyshipRateItem[];
 };
 
+// Easyship v2024-09 docs include "fashion" in the official Rates request example.
+const DEFAULT_EASYSHIP_ITEM_CATEGORY = 'fashion';
+
 export type EasyshipCreateShipmentRequest = EasyshipRateRequest & {
   courierServiceId: string;
   externalReference?: string | null;
@@ -124,6 +127,8 @@ export const summarizeEasyshipPayloadShape = (payload: unknown) => {
   const firstParcelKeys = objectKeys(firstParcel);
   const firstParcelItems =
     isObjectRecord(firstParcel) && Array.isArray(firstParcel.items) ? firstParcel.items : null;
+  const firstParcelFirstItem = Array.isArray(firstParcelItems) ? firstParcelItems[0] : undefined;
+  const firstParcelFirstItemKeys = objectKeys(firstParcelFirstItem);
   return {
     topLevelKeys,
     hasShipmentWrapper: topLevelKeys.includes('shipment'),
@@ -132,6 +137,8 @@ export const summarizeEasyshipPayloadShape = (payload: unknown) => {
     firstParcelKeys,
     firstParcelItemsIsArray: Array.isArray(firstParcelItems),
     firstParcelItemsLength: Array.isArray(firstParcelItems) ? firstParcelItems.length : 0,
+    firstParcelFirstItemKeys,
+    firstParcelFirstItemHasCategory: firstParcelFirstItemKeys.includes('category'),
     skeleton: buildRedactedSkeleton(payload),
   };
 };
@@ -410,6 +417,8 @@ const requestEasyship = async <T>(
       firstParcelKeys: payloadShape.firstParcelKeys,
       firstParcelItemsIsArray: payloadShape.firstParcelItemsIsArray,
       firstParcelItemsLength: payloadShape.firstParcelItemsLength,
+      firstParcelFirstItemKeys: payloadShape.firstParcelFirstItemKeys,
+      firstParcelFirstItemHasCategory: payloadShape.firstParcelFirstItemHasCategory,
       bodySkeleton: payloadShape.skeleton,
     });
   }
@@ -519,6 +528,7 @@ export const buildEasyshipRatesPayload = (input: EasyshipRateRequest) => ({
         total_actual_weight: Number(input.dimensions.weightLb.toFixed(3)),
         items: items.map((item) => ({
           description: item.description,
+          category: DEFAULT_EASYSHIP_ITEM_CATEGORY,
           quantity: item.quantity,
           actual_weight: safePerItemWeight,
           declared_currency: 'USD',
