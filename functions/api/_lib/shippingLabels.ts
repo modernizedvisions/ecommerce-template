@@ -80,6 +80,64 @@ const trimOrNull = (value: unknown): string | null => {
   return trimmed ? trimmed : null;
 };
 
+const US_STATE_CODES = new Set<string>([
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'DC',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
+]);
+
+const normalizeCountryCode = (value: string): string => value.trim().toUpperCase().slice(0, 2);
+
+const isValidUSStateCode = (value: string): boolean => US_STATE_CODES.has(value.trim().toUpperCase());
+
 const toFiniteNumberOrNull = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
@@ -291,7 +349,12 @@ export function validateShipFrom(settings: ShipFromSettings): string[] {
   if (!settings.shipFromName.trim()) missing.push('shipFromName');
   if (!settings.shipFromAddress1.trim()) missing.push('shipFromAddress1');
   if (!settings.shipFromCity.trim()) missing.push('shipFromCity');
-  if (!settings.shipFromState.trim()) missing.push('shipFromState');
+  const shipFromCountry = normalizeCountryCode(settings.shipFromCountry || '');
+  if (shipFromCountry === 'US') {
+    if (!isValidUSStateCode(settings.shipFromState || '')) missing.push('shipFromState');
+  } else if (!settings.shipFromState.trim()) {
+    missing.push('shipFromState');
+  }
   if (!settings.shipFromPostal.trim()) missing.push('shipFromPostal');
   if (!settings.shipFromCountry.trim()) missing.push('shipFromCountry');
   return missing;

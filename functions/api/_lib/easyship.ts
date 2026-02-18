@@ -503,14 +503,42 @@ const requestEasyship = async <T>(
   return (data ?? {}) as T;
 };
 
-const normalizeCarrierKey = (value: string): string => value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+const normalizeCarrierLetters = (value: string): string => value.toUpperCase().replace(/[^A-Z]/g, '');
+
+const canonicalCarrierAlias = (normalized: string): string | null => {
+  if (!normalized) return null;
+  if (normalized.includes('FEDERALEXPRESS')) return 'FEDEX';
+  if (normalized.includes('UNITEDPARCELSERVICE')) return 'UPS';
+  if (normalized.includes('USPOSTALSERVICE')) return 'USPS';
+  return null;
+};
+
+const getCarrierMatchTokens = (value: string): string[] => {
+  const normalized = normalizeCarrierLetters(value);
+  if (!normalized) return [];
+  const tokens = new Set<string>([normalized]);
+  const alias = canonicalCarrierAlias(normalized);
+  if (alias) tokens.add(alias);
+  return Array.from(tokens);
+};
 
 export const getAllowedCarriers = (env: EasyshipEnv): string[] => parseAllowedCarriers(env.EASYSHIP_ALLOWED_CARRIERS);
 
 export const filterAllowedRates = (rates: EasyshipRate[], allowedCarriers: string[]): EasyshipRate[] => {
   if (!allowedCarriers.length) return rates;
-  const allowedKeys = new Set(allowedCarriers.map(normalizeCarrierKey));
-  return rates.filter((rate) => allowedKeys.has(normalizeCarrierKey(rate.carrier)));
+  const allowedTokens = allowedCarriers
+    .flatMap((carrier) => getCarrierMatchTokens(carrier))
+    .filter(Boolean);
+  if (!allowedTokens.length) return rates;
+
+  return rates.filter((rate) => {
+    const carrierTokens = getCarrierMatchTokens(rate.carrier);
+    return carrierTokens.some((carrierToken) =>
+      allowedTokens.some(
+        (allowedToken) => carrierToken.includes(allowedToken) || allowedToken.includes(carrierToken)
+      )
+    );
+  });
 };
 
 export const pickCheapestRate = (rates: EasyshipRate[]): EasyshipRate | null => {

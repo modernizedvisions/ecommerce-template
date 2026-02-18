@@ -90,6 +90,16 @@ const parseCachedRates = (raw: string): ReturnType<typeof normalizeRateForClient
   }
 };
 
+const getRawCarrierName = (rate: { carrier: string; raw: unknown }): string => {
+  if (rate.raw && typeof rate.raw === 'object' && !Array.isArray(rate.raw)) {
+    const raw = rate.raw as Record<string, unknown>;
+    if (typeof raw.courier_name === 'string') return raw.courier_name;
+    if (typeof raw.carrier === 'string') return raw.carrier;
+    if (typeof raw.provider === 'string') return raw.provider;
+  }
+  return rate.carrier;
+};
+
 export async function onRequestPost(
   context: { request: Request; env: ShippingLabelsEnv & Record<string, string | undefined> }
 ): Promise<Response> {
@@ -193,6 +203,16 @@ export async function onRequestPost(
     }
 
     const rawRates = await fetchEasyshipRates(context.env, rateRequest);
+    const allowedRates = filterAllowedRates(rawRates, allowedCarriers).sort((a, b) => a.amountCents - b.amountCents);
+    if (isEasyshipDebugEnabled(context.env)) {
+      console.log('[easyship][debug] quotes rates pre/post filter', {
+        orderId: params.orderId,
+        shipmentId: params.shipmentId,
+        rawRatesCount: rawRates.length,
+        rawCarrierNames: rawRates.slice(0, 10).map((rate) => getRawCarrierName(rate)),
+        filteredRatesCount: allowedRates.length,
+      });
+    }
     if (!rawRates.length) {
       await context.env.DB.prepare(
         `UPDATE order_shipments
@@ -213,7 +233,6 @@ export async function onRequestPost(
         shipments,
       });
     }
-    const allowedRates = filterAllowedRates(rawRates, allowedCarriers).sort((a, b) => a.amountCents - b.amountCents);
     if (!allowedRates.length) {
       return jsonResponse(
         { ok: false, code: 'NO_QUOTES', error: 'No supported carrier quotes found for this parcel.' },

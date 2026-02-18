@@ -45,6 +45,97 @@ const numberOrNull = (value: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const US_STATE_CODES = [
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'DC',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
+] as const;
+
+const US_STATE_CODE_SET = new Set<string>(US_STATE_CODES);
+
+const normalizeCountryCode = (value: string): string => value.trim().toUpperCase().slice(0, 2);
+
+const normalizeUSStateCode = (value: string): string => {
+  const normalized = value.trim().toUpperCase();
+  return US_STATE_CODE_SET.has(normalized) ? normalized : '';
+};
+
+const mapShipFromForForm = (
+  value: ShipFromSettings
+): {
+  shipFrom: ShipFromSettings;
+  needsStateReselection: boolean;
+} => {
+  const shipFromCountry = normalizeCountryCode(value.shipFromCountry || 'US') || 'US';
+  if (shipFromCountry !== 'US') {
+    return {
+      shipFrom: {
+        ...value,
+        shipFromCountry,
+      },
+      needsStateReselection: false,
+    };
+  }
+
+  const normalizedState = normalizeUSStateCode(value.shipFromState);
+  return {
+    shipFrom: {
+      ...value,
+      shipFromCountry,
+      shipFromState: normalizedState,
+    },
+    needsStateReselection: Boolean(value.shipFromState.trim()) && !normalizedState,
+  };
+};
+
 export function AdminShippingSettingsTab() {
   const [shipFrom, setShipFrom] = useState<ShipFromSettings>(emptyShipFrom);
   const [boxPresets, setBoxPresets] = useState<ShippingBoxPreset[]>([]);
@@ -59,12 +150,19 @@ export function AdminShippingSettingsTab() {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<PresetDraft>(emptyPresetDraft);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [shipFromStateError, setShipFromStateError] = useState<string | null>(null);
+  const [shipFromStateNeedsReselection, setShipFromStateNeedsReselection] = useState(false);
+
+  const shipFromCountryIsUS = normalizeCountryCode(shipFrom.shipFromCountry || 'US') === 'US';
 
   const loadSettings = async () => {
     setIsLoading(true);
     try {
       const data = await adminFetchShippingSettings();
-      setShipFrom(data.shipFrom || emptyShipFrom);
+      const prepared = mapShipFromForForm(data.shipFrom || emptyShipFrom);
+      setShipFrom(prepared.shipFrom);
+      setShipFromStateNeedsReselection(prepared.needsStateReselection);
+      setShipFromStateError(null);
       setBoxPresets(data.boxPresets || []);
       setStatus({ type: null, message: '' });
     } catch (error) {
@@ -102,10 +200,31 @@ export function AdminShippingSettingsTab() {
 
   const handleSaveShipFrom = async (event: FormEvent) => {
     event.preventDefault();
+
+    const shipFromCountry = normalizeCountryCode(shipFrom.shipFromCountry || 'US') || 'US';
+    const payload: Partial<ShipFromSettings> = {
+      ...shipFrom,
+      shipFromCountry,
+    };
+    if (shipFromCountry === 'US') {
+      const normalizedState = normalizeUSStateCode(shipFrom.shipFromState);
+      if (!normalizedState) {
+        const errorMessage = 'State is required for US ship-from addresses. Please select a valid 2-letter code.';
+        setShipFromStateError(errorMessage);
+        setStatus({ type: 'error', message: errorMessage });
+        return;
+      }
+      payload.shipFromState = normalizedState;
+    }
+
+    setShipFromStateError(null);
+    setShipFromStateNeedsReselection(false);
     setIsSavingShipFrom(true);
     try {
-      const saved = await adminUpdateShipFrom(shipFrom);
-      setShipFrom(saved);
+      const saved = await adminUpdateShipFrom(payload);
+      const prepared = mapShipFromForForm(saved);
+      setShipFrom(prepared.shipFrom);
+      setShipFromStateNeedsReselection(prepared.needsStateReselection);
       setStatus({ type: 'success', message: 'Ship-from settings saved.' });
     } catch (error) {
       setStatus({
@@ -258,11 +377,41 @@ export function AdminShippingSettingsTab() {
             </div>
             <div>
               <label className="lux-label mb-2 block">State</label>
-              <input
-                className="lux-input"
-                value={shipFrom.shipFromState}
-                onChange={(e) => setShipFrom((prev) => ({ ...prev, shipFromState: e.target.value }))}
-              />
+              {shipFromCountryIsUS ? (
+                <select
+                  className="lux-input"
+                  value={shipFrom.shipFromState}
+                  onChange={(e) => {
+                    setShipFrom((prev) => ({ ...prev, shipFromState: e.target.value }));
+                    setShipFromStateError(null);
+                    setShipFromStateNeedsReselection(false);
+                  }}
+                >
+                  <option value="">Select state</option>
+                  {US_STATE_CODES.map((stateCode) => (
+                    <option key={stateCode} value={stateCode}>
+                      {stateCode}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="lux-input"
+                  value={shipFrom.shipFromState}
+                  onChange={(e) => setShipFrom((prev) => ({ ...prev, shipFromState: e.target.value }))}
+                />
+              )}
+              {shipFromCountryIsUS && (
+                <p className="mt-1 text-xs text-charcoal/60">Use state abbreviation (e.g., NY, PA).</p>
+              )}
+              {shipFromStateNeedsReselection && shipFromCountryIsUS && (
+                <p className="mt-1 text-xs text-amber-700">
+                  Saved state value is not a valid US abbreviation. Please reselect.
+                </p>
+              )}
+              {shipFromStateError && shipFromCountryIsUS && (
+                <p className="mt-1 text-xs text-rose-700">{shipFromStateError}</p>
+              )}
             </div>
             <div>
               <label className="lux-label mb-2 block">Postal Code</label>
@@ -277,9 +426,25 @@ export function AdminShippingSettingsTab() {
               <input
                 className="lux-input"
                 value={shipFrom.shipFromCountry}
-                onChange={(e) =>
-                  setShipFrom((prev) => ({ ...prev, shipFromCountry: e.target.value.toUpperCase().slice(0, 2) }))
-                }
+                onChange={(e) => {
+                  const shipFromCountry = normalizeCountryCode(e.target.value) || 'US';
+                  if (shipFromCountry === 'US') {
+                    const normalizedState = normalizeUSStateCode(shipFrom.shipFromState);
+                    setShipFromStateNeedsReselection(Boolean(shipFrom.shipFromState.trim()) && !normalizedState);
+                    setShipFrom((prev) => ({
+                      ...prev,
+                      shipFromCountry,
+                      shipFromState: normalizedState,
+                    }));
+                  } else {
+                    setShipFromStateNeedsReselection(false);
+                    setShipFrom((prev) => ({
+                      ...prev,
+                      shipFromCountry,
+                    }));
+                  }
+                  setShipFromStateError(null);
+                }}
               />
             </div>
             <div className="md:col-span-2 flex items-center gap-3">
@@ -446,4 +611,3 @@ export function AdminShippingSettingsTab() {
     </div>
   );
 }
-

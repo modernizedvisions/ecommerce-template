@@ -12,6 +12,67 @@ const trimOrNull = (value: unknown): string | null => {
   return trimmed ? trimmed : null;
 };
 
+const US_STATE_CODES = new Set<string>([
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'DC',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
+]);
+
+const normalizeCountryCode = (value: string): string => value.trim().toUpperCase().slice(0, 2);
+
+const normalizeUSStateCode = (value: string): string => {
+  const normalized = value.trim().toUpperCase();
+  return US_STATE_CODES.has(normalized) ? normalized : '';
+};
+
 export async function onRequestPost(context: { request: Request; env: ShippingLabelsEnv }): Promise<Response> {
   const unauthorized = await requireAdmin(context.request, context.env as any);
   if (unauthorized) return unauthorized;
@@ -27,10 +88,22 @@ export async function onRequestPost(context: { request: Request; env: ShippingLa
     const shipFromAddress1 = trimOrNull(body.shipFromAddress1) || '';
     const shipFromAddress2 = trimOrNull(body.shipFromAddress2) || '';
     const shipFromCity = trimOrNull(body.shipFromCity) || '';
-    const shipFromState = trimOrNull(body.shipFromState) || '';
+    const rawShipFromState = trimOrNull(body.shipFromState) || '';
     const shipFromPostal = trimOrNull(body.shipFromPostal) || '';
-    const shipFromCountry = (trimOrNull(body.shipFromCountry) || 'US').toUpperCase();
+    const shipFromCountry = normalizeCountryCode(trimOrNull(body.shipFromCountry) || 'US') || 'US';
     const shipFromPhone = trimOrNull(body.shipFromPhone) || '';
+    const shipFromState = shipFromCountry === 'US' ? normalizeUSStateCode(rawShipFromState) : rawShipFromState;
+
+    if (shipFromCountry === 'US' && !shipFromState) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: 'Invalid ship-from state',
+          detail: 'For US ship-from addresses, state is required and must be a 2-letter abbreviation (e.g., PA).',
+        },
+        400
+      );
+    }
 
     await context.env.DB.prepare(
       `UPDATE site_settings
@@ -73,4 +146,3 @@ export async function onRequest(context: { request: Request; env: ShippingLabels
   }
   return onRequestPost(context);
 }
-
