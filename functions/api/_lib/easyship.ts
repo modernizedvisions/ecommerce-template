@@ -256,6 +256,20 @@ const maybeText = (value: unknown): string | null => {
   return String(value);
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const extractRawRatesArray = (data: any): any[] =>
+  Array.isArray(data?.rates)
+    ? data.rates
+    : Array.isArray(data?.couriers)
+    ? data.couriers
+    : Array.isArray(data?.data?.rates)
+    ? data.data.rates
+    : Array.isArray(data?.data?.couriers)
+    ? data.data.couriers
+    : [];
+
 const truncateText = (value: string | null, maxLength = 240): string | null => {
   if (!value) return null;
   if (value.length <= maxLength) return value;
@@ -338,15 +352,28 @@ class EasyshipHttpError extends Error {
 }
 
 const parseRatesFromResponse = (data: any): EasyshipRate[] => {
-  const source: any[] = Array.isArray(data?.rates)
-    ? data.rates
-    : Array.isArray(data?.couriers)
-    ? data.couriers
-    : Array.isArray(data?.data?.rates)
-    ? data.data.rates
-    : Array.isArray(data?.data?.couriers)
-    ? data.data.couriers
-    : [];
+  const source: any[] = extractRawRatesArray(data);
+
+  const deepFindByKeys = (input: unknown, keys: string[], depth = 0): unknown => {
+    if (depth > 4 || input === null || input === undefined) return undefined;
+    if (Array.isArray(input)) {
+      for (const entry of input) {
+        const found = deepFindByKeys(entry, keys, depth + 1);
+        if (found !== undefined) return found;
+      }
+      return undefined;
+    }
+    if (!isRecord(input)) return undefined;
+
+    for (const [key, value] of Object.entries(input)) {
+      if (keys.includes(key)) return value;
+    }
+    for (const value of Object.values(input)) {
+      const found = deepFindByKeys(value, keys, depth + 1);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  };
 
   const readPath = (input: any, path: string): unknown => {
     if (!input || typeof input !== 'object') return undefined;
@@ -370,7 +397,14 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
   const firstAmountCents = (input: any, paths: string[]): number | null => {
     for (const path of paths) {
       const value = readPath(input, path);
-      const cents = toAmountCents(value);
+      const cents =
+        toAmountCents(value) ??
+        (isRecord(value)
+          ? toAmountCents(value.amount) ??
+            toAmountCents(value.total) ??
+            toAmountCents(value.value) ??
+            toAmountCents(value.price)
+          : null);
       if (cents !== null) return cents;
     }
     return null;
@@ -386,8 +420,8 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
   };
 
   const normalized = source
-    .map((rate: any): EasyshipRate | null => {
-      const id =
+    .map((rate: any, index: number): EasyshipRate | null => {
+      const idCandidate =
         firstText(rate, [
           'courier_service_id',
           'rate_id',
@@ -396,8 +430,9 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
           'courier_service.id',
           'courier.id',
           'service.id',
-        ]) || null;
-      const carrier =
+        ]) ||
+        trimOrNull(deepFindByKeys(rate, ['courier_service_id', 'rate_id', 'id', 'service_id']) || null);
+      const carrierCandidate =
         firstText(rate, [
           'courier_name',
           'carrier',
@@ -407,8 +442,9 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
           'courier.company_name',
           'service.courier_name',
           'service.provider',
-        ]) || null;
-      const service =
+        ]) ||
+        trimOrNull(deepFindByKeys(rate, ['courier_name', 'carrier', 'provider']) || null);
+      const serviceCandidate =
         firstText(rate, [
           'service_name',
           'service_level_name',
@@ -418,8 +454,9 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
           'service.name',
           'shipping_service_name',
           'shipping_service',
-        ]) || null;
-      const amountCents =
+        ]) ||
+        trimOrNull(deepFindByKeys(rate, ['service_name', 'service_level_name', 'service']) || null);
+      const amountCandidate =
         firstAmountCents(rate, [
           'total_charge',
           'shipping_rate',
@@ -430,7 +467,9 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
           'shipment_charge.amount',
           'shipping_total',
           'total',
-        ]) ?? null;
+        ]) ??
+        toAmountCents(deepFindByKeys(rate, ['total_charge', 'shipping_rate', 'rate', 'amount', 'total'])) ??
+        null;
       const currency =
         firstText(rate, [
           'currency',
@@ -444,7 +483,10 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
       const etaDaysMax =
         firstNumber(rate, ['delivery_days_max', 'estimated_delivery_days_max', 'delivery.eta_max']) ?? null;
 
-      if (!id || !carrier || !service || amountCents === null) return null;
+      const id = idCandidate || `easyship-rate-${index + 1}`;
+      const carrier = carrierCandidate || 'UNKNOWN';
+      const service = serviceCandidate || carrier;
+      const amountCents = amountCandidate ?? 0;
       return {
         id,
         carrier,
@@ -945,7 +987,26 @@ export async function fetchEasyshipRates(env: EasyshipEnv, input: EasyshipRateRe
   }
   try {
     const response = await requestEasyshipDetailed<any>(env, '/rates', 'POST', payload);
+    const rawRates = extractRawRatesArray(response.data);
+    if (debugEnabled) {
+      console.log('[easyship][debug] rates raw parse snapshot', {
+        rawRatesLength: rawRates.length,
+        rawFirstRateKeys:
+          rawRates[0] && typeof rawRates[0] === 'object' && !Array.isArray(rawRates[0])
+            ? Object.keys(rawRates[0] as Record<string, unknown>)
+            : [],
+      });
+    }
     const rates = parseRatesFromResponse(response.data);
+    if (debugEnabled) {
+      console.log('[easyship][debug] rates normalized snapshot', {
+        returnedRatesLength: rates.length,
+        returnedFirstRateKeys:
+          rates[0] && typeof rates[0] === 'object' && !Array.isArray(rates[0])
+            ? Object.keys(rates[0] as Record<string, unknown>)
+            : [],
+      });
+    }
     const warning = getResponseWarning(response.data);
     const hasError = response.hasError;
     if (hasError && !rates.length && debugEnabled) {
