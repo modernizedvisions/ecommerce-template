@@ -241,7 +241,15 @@ export async function onRequestPost(
         shipmentId: params.shipmentId,
         rawRatesCount: rawRates.length,
         rawCarrierNames: rawRates.slice(0, 10).map((rate) => getRawCarrierName(rate)),
+        rawCarrierServices: rawRates.slice(0, 10).map((rate) => ({
+          carrier: rate.carrier,
+          service: rate.service,
+        })),
         filteredRatesCount: allowedRates.length,
+        filteredCarrierServices: allowedRates.slice(0, 10).map((rate) => ({
+          carrier: rate.carrier,
+          service: rate.service,
+        })),
         rawResponseHints: liveRates.rawResponseHints || null,
       });
     }

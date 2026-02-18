@@ -234,13 +234,12 @@ const normalizeBaseUrl = (value: string | undefined): string => {
 };
 
 const parseAllowedCarriers = (value: string | undefined): string[] => {
-  const fallback = ['USPS', 'UPS', 'FEDEX'];
-  if (!value || !value.trim()) return fallback;
+  if (!value || !value.trim()) return [];
   const parsed = value
     .split(',')
     .map((part) => part.trim().toUpperCase())
     .filter(Boolean);
-  return parsed.length ? Array.from(new Set(parsed)) : fallback;
+  return parsed.length ? Array.from(new Set(parsed)) : [];
 };
 
 const toSlug = (value: string): string =>
@@ -354,6 +353,22 @@ class EasyshipHttpError extends Error {
 const parseRatesFromResponse = (data: any): EasyshipRate[] => {
   const source: any[] = extractRawRatesArray(data);
 
+  const stableHash = (value: string): string => {
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i += 1) {
+      hash ^= value.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+  };
+
+  const carrierFromFullDescription = (value: string | null): string | null => {
+    if (!value) return null;
+    const firstToken = value.trim().split(/\s+/)[0] || '';
+    const cleaned = firstToken.replace(/[^A-Za-z0-9]/g, '');
+    return cleaned || null;
+  };
+
   const deepFindByKeys = (input: unknown, keys: string[], depth = 0): unknown => {
     if (depth > 4 || input === null || input === undefined) return undefined;
     if (Array.isArray(input)) {
@@ -421,7 +436,14 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
 
   const normalized = source
     .map((rate: any, index: number): EasyshipRate | null => {
+      const courierService = isRecord(rate?.courier_service) ? (rate.courier_service as Record<string, unknown>) : null;
+      const courierRecord =
+        courierService && isRecord(courierService.courier) ? (courierService.courier as Record<string, unknown>) : null;
+      const fullDescription = trimOrNull(rate?.full_description);
+      const description = trimOrNull(rate?.description);
+
       const idCandidate =
+        trimOrNull(courierService?.id) ||
         firstText(rate, [
           'courier_service_id',
           'rate_id',
@@ -433,6 +455,10 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
         ]) ||
         trimOrNull(deepFindByKeys(rate, ['courier_service_id', 'rate_id', 'id', 'service_id']) || null);
       const carrierCandidate =
+        trimOrNull(courierService?.courier_name) ||
+        trimOrNull(courierRecord?.name) ||
+        trimOrNull(courierRecord?.display_name) ||
+        carrierFromFullDescription(fullDescription) ||
         firstText(rate, [
           'courier_name',
           'carrier',
@@ -445,6 +471,10 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
         ]) ||
         trimOrNull(deepFindByKeys(rate, ['courier_name', 'carrier', 'provider']) || null);
       const serviceCandidate =
+        trimOrNull(courierService?.service_name) ||
+        trimOrNull(courierService?.name) ||
+        description ||
+        fullDescription ||
         firstText(rate, [
           'service_name',
           'service_level_name',
@@ -483,7 +513,8 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
       const etaDaysMax =
         firstNumber(rate, ['delivery_days_max', 'estimated_delivery_days_max', 'delivery.eta_max']) ?? null;
 
-      const id = idCandidate || `easyship-rate-${index + 1}`;
+      const fallbackIdBase = `${carrierCandidate || 'UNKNOWN'}|${serviceCandidate || 'UNKNOWN'}|${amountCandidate ?? 0}`;
+      const id = idCandidate || `easyship-rate-${stableHash(fallbackIdBase)}-${index + 1}`;
       const carrier = carrierCandidate || 'UNKNOWN';
       const service = serviceCandidate || carrier;
       const amountCents = amountCandidate ?? 0;
@@ -989,11 +1020,21 @@ export async function fetchEasyshipRates(env: EasyshipEnv, input: EasyshipRateRe
     const response = await requestEasyshipDetailed<any>(env, '/rates', 'POST', payload);
     const rawRates = extractRawRatesArray(response.data);
     if (debugEnabled) {
+      const firstRawCourierService =
+        rawRates[0] && typeof rawRates[0] === 'object' && !Array.isArray(rawRates[0])
+          ? ((rawRates[0] as Record<string, unknown>).courier_service as unknown)
+          : null;
       console.log('[easyship][debug] rates raw parse snapshot', {
         rawRatesLength: rawRates.length,
         rawFirstRateKeys:
           rawRates[0] && typeof rawRates[0] === 'object' && !Array.isArray(rawRates[0])
             ? Object.keys(rawRates[0] as Record<string, unknown>)
+            : [],
+        rawCourierServiceKeys:
+          firstRawCourierService &&
+          typeof firstRawCourierService === 'object' &&
+          !Array.isArray(firstRawCourierService)
+            ? Object.keys(firstRawCourierService as Record<string, unknown>)
             : [],
       });
     }
@@ -1005,6 +1046,10 @@ export async function fetchEasyshipRates(env: EasyshipEnv, input: EasyshipRateRe
           rates[0] && typeof rates[0] === 'object' && !Array.isArray(rates[0])
             ? Object.keys(rates[0] as Record<string, unknown>)
             : [],
+        extractedCarrierServiceSample: rates.slice(0, 5).map((rate) => ({
+          carrier: rate.carrier,
+          service: rate.service,
+        })),
       });
     }
     const warning = getResponseWarning(response.data);
