@@ -325,6 +325,20 @@ const getResponseErrorDetailsLength = (data: any): number | null => {
   return null;
 };
 
+const summarizeErrorDetailsForDebug = (data: any): unknown => {
+  const details = data?.error?.details ?? data?.details;
+  if (!details) return null;
+  if (Array.isArray(details)) {
+    return details.slice(0, 10).map((entry) => {
+      if (typeof entry === 'string') return truncateText(entry, 200);
+      return buildRedactedSkeleton(entry);
+    });
+  }
+  if (typeof details === 'string') return truncateText(details, 200);
+  if (typeof details === 'object') return buildRedactedSkeleton(details);
+  return null;
+};
+
 const getRatesArrayLengthHint = (data: any): number | null => {
   if (Array.isArray(data?.rates)) return data.rates.length;
   if (Array.isArray(data?.couriers)) return data.couriers.length;
@@ -765,6 +779,15 @@ const requestEasyshipDetailed = async <T>(
       errorDetailsLength,
       ratesLength,
     });
+    if (!response.ok) {
+      console.log('[easyship][debug] response error details', {
+        method,
+        endpoint,
+        status: response.status,
+        errorCode,
+        errorDetails: summarizeErrorDetailsForDebug(data),
+      });
+    }
   }
 
   if (!response.ok && options?.throwOnHttpError !== false) {
@@ -982,18 +1005,39 @@ const buildShipmentPayload = (input: EasyshipCreateShipmentRequest) => ({
       country_alpha2: input.destination.countryCode,
     },
     parcels: [
-      {
-        box: {
-          length: Number(input.dimensions.lengthIn.toFixed(2)),
-          width: Number(input.dimensions.widthIn.toFixed(2)),
-          height: Number(input.dimensions.heightIn.toFixed(2)),
-          unit: 'in',
-        },
-        item: {
-          actual_weight: Number(input.dimensions.weightLb.toFixed(3)),
-          weight_unit: 'lb',
-        },
-      },
+      (() => {
+        const items = toNonEmptyRateItems(input.items);
+        const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+        const safeTotalQuantity = totalQuantity > 0 ? totalQuantity : 1;
+        const totalWeightLb = Number(input.dimensions.weightLb.toFixed(3));
+        const perItemWeightLb = Number((totalWeightLb / safeTotalQuantity).toFixed(4));
+        const safePerItemWeightLb = perItemWeightLb > 0 ? perItemWeightLb : 0.001;
+
+        return {
+          box: {
+            length: Number(input.dimensions.lengthIn.toFixed(2)),
+            width: Number(input.dimensions.widthIn.toFixed(2)),
+            height: Number(input.dimensions.heightIn.toFixed(2)),
+            unit: 'in',
+          },
+          total_actual_weight: totalWeightLb,
+          items: items.map((item) => {
+            const baseDeclaredValueCents = Math.round(Number(item.declaredValueCents ?? 1));
+            const safeDeclaredValueCents = Number.isFinite(baseDeclaredValueCents)
+              ? Math.max(1, baseDeclaredValueCents)
+              : 1;
+            return {
+              description: item.description || 'Order items',
+              category: DEFAULT_EASYSHIP_ITEM_CATEGORY,
+              quantity: Math.max(1, item.quantity || 1),
+              actual_weight: safePerItemWeightLb,
+              weight_unit: 'lb',
+              declared_currency: 'USD',
+              declared_customs_value: Number((safeDeclaredValueCents / 100).toFixed(2)),
+            };
+          }),
+        };
+      })(),
     ],
     courier_service_id: input.courierServiceId,
     external_reference: input.externalReference ?? undefined,
@@ -1152,6 +1196,7 @@ export async function createShipmentAndBuyLabel(
       parcelsCount: payloadShape.parcelsCount,
       firstParcelKeys: payloadShape.firstParcelKeys,
       firstParcelItemsLength: payloadShape.firstParcelItemsLength,
+      firstParcelFirstItemKeys: payloadShape.firstParcelFirstItemKeys,
       zeroParcelsReason: payloadShape.parcelsCount === 0 ? (invalidDimensionsReason.length ? invalidDimensionsReason : ['unknown']) : [],
     });
   }
