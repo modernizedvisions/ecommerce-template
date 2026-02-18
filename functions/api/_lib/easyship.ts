@@ -156,17 +156,25 @@ export const summarizeEasyshipPayloadShape = (payload: unknown) => {
   const topLevelKeys = objectKeys(payload);
   const shipmentValue = isObjectRecord(payload) ? payload.shipment : undefined;
   const shipmentKeys = objectKeys(shipmentValue);
-  const parcels = isObjectRecord(payload) && Array.isArray(payload.parcels) ? payload.parcels : [];
+  const topLevelParcels = isObjectRecord(payload) && Array.isArray(payload.parcels) ? payload.parcels : [];
+  const shipmentParcels =
+    isObjectRecord(shipmentValue) && Array.isArray(shipmentValue.parcels) ? shipmentValue.parcels : [];
+  const parcels = topLevelParcels.length ? topLevelParcels : shipmentParcels;
   const firstParcel = parcels[0];
   const firstParcelKeys = objectKeys(firstParcel);
   const firstParcelItems =
-    isObjectRecord(firstParcel) && Array.isArray(firstParcel.items) ? firstParcel.items : null;
+    isObjectRecord(firstParcel) && Array.isArray(firstParcel.items)
+      ? firstParcel.items
+      : isObjectRecord(firstParcel) && isObjectRecord(firstParcel.item)
+      ? [firstParcel.item]
+      : null;
   const firstParcelFirstItem = Array.isArray(firstParcelItems) ? firstParcelItems[0] : undefined;
   const firstParcelFirstItemKeys = objectKeys(firstParcelFirstItem);
   return {
     topLevelKeys,
     hasShipmentWrapper: topLevelKeys.includes('shipment'),
     shipmentWrapperKeys: shipmentKeys,
+    parcelSource: topLevelParcels.length ? 'top_level' : shipmentParcels.length ? 'shipment_wrapper' : 'none',
     parcelsCount: parcels.length,
     firstParcelKeys,
     firstParcelItemsIsArray: Array.isArray(firstParcelItems),
@@ -707,6 +715,7 @@ const requestEasyshipDetailed = async <T>(
       bodyTopLevelKeys: payloadShape.topLevelKeys,
       hasShipmentWrapper: payloadShape.hasShipmentWrapper,
       shipmentWrapperKeys: payloadShape.shipmentWrapperKeys,
+      parcelSource: payloadShape.parcelSource,
       parcelsCount: payloadShape.parcelsCount,
       firstParcelKeys: payloadShape.firstParcelKeys,
       firstParcelItemsIsArray: payloadShape.firstParcelItemsIsArray,
@@ -986,7 +995,7 @@ const buildShipmentPayload = (input: EasyshipCreateShipmentRequest) => ({
         },
       },
     ],
-    selected_courier_id: input.courierServiceId,
+    courier_service_id: input.courierServiceId,
     external_reference: input.externalReference ?? undefined,
   },
 });
@@ -1121,6 +1130,39 @@ export async function createShipmentAndBuyLabel(
   }
 
   const payload = buildShipmentPayload(input);
+  const payloadShape = summarizeEasyshipPayloadShape(payload);
+  const invalidDimensionsReason: string[] = [];
+  if (!Number.isFinite(input.dimensions.lengthIn) || input.dimensions.lengthIn <= 0) invalidDimensionsReason.push('lengthIn');
+  if (!Number.isFinite(input.dimensions.widthIn) || input.dimensions.widthIn <= 0) invalidDimensionsReason.push('widthIn');
+  if (!Number.isFinite(input.dimensions.heightIn) || input.dimensions.heightIn <= 0) invalidDimensionsReason.push('heightIn');
+  if (!Number.isFinite(input.dimensions.weightLb) || input.dimensions.weightLb <= 0) invalidDimensionsReason.push('weightLb');
+
+  if (isEasyshipDebugEnabled(env)) {
+    const [orderId, shipmentId] = (input.externalReference || '').split(':');
+    console.log('[easyship][debug] create shipment preflight', {
+      orderId: orderId || null,
+      shipmentId: shipmentId || null,
+      courierServiceIdPresent: !!trimOrNull(input.courierServiceId),
+      dimensions: {
+        lengthIn: Number(input.dimensions.lengthIn.toFixed(2)),
+        widthIn: Number(input.dimensions.widthIn.toFixed(2)),
+        heightIn: Number(input.dimensions.heightIn.toFixed(2)),
+        weightLb: Number(input.dimensions.weightLb.toFixed(3)),
+      },
+      parcelsCount: payloadShape.parcelsCount,
+      firstParcelKeys: payloadShape.firstParcelKeys,
+      firstParcelItemsLength: payloadShape.firstParcelItemsLength,
+      zeroParcelsReason: payloadShape.parcelsCount === 0 ? (invalidDimensionsReason.length ? invalidDimensionsReason : ['unknown']) : [],
+    });
+  }
+
+  if (payloadShape.parcelsCount === 0) {
+    throw new Error(
+      invalidDimensionsReason.length
+        ? `Shipment payload has zero parcels due to invalid dimensions/weight: ${invalidDimensionsReason.join(', ')}`
+        : 'Shipment payload has zero parcels'
+    );
+  }
   const created = await requestEasyship<any>(env, '/shipments', 'POST', payload);
   const createSnapshot = normalizeShipmentSnapshot(created);
   const shipmentId = createSnapshot.shipmentId;

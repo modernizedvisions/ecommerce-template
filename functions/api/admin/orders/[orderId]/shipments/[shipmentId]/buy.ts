@@ -209,10 +209,24 @@ export async function onRequestPost(
   try {
     await ensureShippingLabelsSchema(context.env.DB);
     if (!(await orderExists(context.env.DB, params.orderId))) {
+      if (isEasyshipDebugEnabled(context.env)) {
+        console.log('[easyship][debug] buy preflight failed', {
+          orderId: params.orderId,
+          shipmentId: params.shipmentId,
+          reason: 'order not found',
+        });
+      }
       return jsonResponse({ ok: false, error: 'Order not found' }, 404);
     }
     const shipment = await getOrderShipment(context.env.DB, params.orderId, params.shipmentId);
     if (!shipment) {
+      if (isEasyshipDebugEnabled(context.env)) {
+        console.log('[easyship][debug] buy preflight failed', {
+          orderId: params.orderId,
+          shipmentId: params.shipmentId,
+          reason: 'shipment not found',
+        });
+      }
       return jsonResponse({ ok: false, error: 'Shipment not found' }, 404);
     }
 
@@ -272,8 +286,43 @@ export async function onRequestPost(
 
     const dimensions = resolveShipmentDimensions(shipment);
     if (!dimensions) {
+      if (isEasyshipDebugEnabled(context.env)) {
+        console.log('[easyship][debug] buy preflight parcel guard failed', {
+          orderId: params.orderId,
+          shipmentId: params.shipmentId,
+          reason: 'resolveShipmentDimensions returned null',
+          effectiveLengthIn: shipment.effectiveLengthIn,
+          effectiveWidthIn: shipment.effectiveWidthIn,
+          effectiveHeightIn: shipment.effectiveHeightIn,
+          weightLb: shipment.weightLb,
+        });
+      }
       return jsonResponse(
-        { ok: false, code: 'PARCEL_INCOMPLETE', error: 'Shipment is missing dimensions or weight.' },
+        {
+          ok: false,
+          code: 'PARCEL_INCOMPLETE',
+          error: 'Shipment is missing box dimensions or weight. Please fill them in before buying a label.',
+        },
+        400
+      );
+    }
+    const expectedParcelsCount =
+      dimensions.lengthIn > 0 && dimensions.widthIn > 0 && dimensions.heightIn > 0 && dimensions.weightLb > 0 ? 1 : 0;
+    if (expectedParcelsCount === 0) {
+      if (isEasyshipDebugEnabled(context.env)) {
+        console.log('[easyship][debug] buy preflight parcel guard failed', {
+          orderId: params.orderId,
+          shipmentId: params.shipmentId,
+          reason: 'computed parcels count is 0',
+          dimensions,
+        });
+      }
+      return jsonResponse(
+        {
+          ok: false,
+          code: 'PARCEL_INCOMPLETE',
+          error: 'Shipment is missing box dimensions or weight. Please fill them in before buying a label.',
+        },
         400
       );
     }
@@ -363,6 +412,15 @@ export async function onRequestPost(
       return jsonResponse({ ok: false, code: 'NO_RATE_SELECTED', error: 'No rate available for label purchase.' }, 400);
     }
 
+    if (isEasyshipDebugEnabled(context.env)) {
+      console.log('[easyship][debug] buy create-shipment input', {
+        orderId: params.orderId,
+        shipmentId: params.shipmentId,
+        selectedQuoteId,
+        dimensions,
+        expectedParcelsCount,
+      });
+    }
     const created = await createShipmentAndBuyLabel(context.env, {
       ...rateRequest,
       courierServiceId: selectedQuoteId,
