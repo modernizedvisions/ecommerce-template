@@ -6,6 +6,7 @@ import {
   adminCreateOrderShipment,
   adminDeleteOrderShipment,
   adminFetchOrderShipments,
+  adminFetchShipmentLabelStatus,
   adminFetchShipmentQuotes,
   adminFetchShippingSettings,
   adminUpdateOrderShipment,
@@ -309,19 +310,16 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
     });
   };
 
-  const handleBuyLabel = async (shipment: OrderShipment, refreshOnly = false) => {
+  const handleBuyLabel = async (shipment: OrderShipment) => {
     if (!orderId) return;
-    await withShipmentBusy(shipment.id, refreshOnly ? 'refreshing' : 'buying', async () => {
-      if (!refreshOnly && quoteWarningByShipment[shipment.id]) {
+    await withShipmentBusy(shipment.id, 'buying', async () => {
+      if (quoteWarningByShipment[shipment.id]) {
         throw new Error(quoteWarningByShipment[shipment.id]);
       }
-      if (!refreshOnly) {
-        await persistShipmentDraft(shipment.id);
-      }
+      await persistShipmentDraft(shipment.id);
       const selectedQuoteId = selectedQuoteByShipment[shipment.id] || null;
       const bought = await adminBuyShipmentLabel(orderId, shipment.id, {
         quoteSelectedId: selectedQuoteId,
-        refresh: refreshOnly,
       });
       setShipments(bought.shipments);
       seedDrafts(bought.shipments);
@@ -331,9 +329,23 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
       setSuccess(
         bought.pendingRefresh
           ? 'Label is pending. Use Refresh to check status.'
-          : refreshOnly
-          ? 'Shipment refreshed.'
           : 'Label purchased successfully.'
+      );
+    });
+  };
+
+  const handleRefreshLabel = async (shipment: OrderShipment) => {
+    if (!orderId) return;
+    await withShipmentBusy(shipment.id, 'refreshing', async () => {
+      const refreshed = await adminFetchShipmentLabelStatus(orderId, shipment.id);
+      setShipments(refreshed.shipments);
+      seedDrafts(refreshed.shipments);
+      setSuccess(
+        refreshed.pendingRefresh
+          ? 'Label still generating. Try refresh again shortly.'
+          : refreshed.refreshed
+          ? 'Label status refreshed.'
+          : 'Label status is up to date.'
       );
     });
   };
@@ -469,6 +481,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                     const selectedQuoteId = selectedQuoteByShipment[shipment.id] || shipment.quoteSelectedId || null;
                     const canRemove = !shipment.purchasedAt && shipment.labelState !== 'generated';
                     const pendingRefresh = shipment.labelState === 'pending' && !!shipment.easyshipShipmentId;
+                    const canBuyLabel = !shipment.purchasedAt && shipment.labelState !== 'generated';
                     return (
                       <div key={shipment.id} className="lux-panel p-4">
                         <div className="mb-3 flex items-center justify-between gap-3">
@@ -573,25 +586,14 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                           >
                             Get Quotes
                           </button>
-                          {pendingRefresh ? (
-                            <button
-                              type="button"
-                              className="lux-button px-3 py-2 text-[10px] self-end"
-                              onClick={() => void handleBuyLabel(shipment, true)}
-                            >
-                              <RefreshCcw className="h-4 w-4" />
-                              Refresh
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="lux-button px-3 py-2 text-[10px] self-end"
-                              disabled={!shipFromReady || !!quoteWarning}
-                              onClick={() => void handleBuyLabel(shipment)}
-                            >
-                              Buy Label
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            className="lux-button px-3 py-2 text-[10px] self-end"
+                            disabled={!shipFromReady || !!quoteWarning || !canBuyLabel}
+                            onClick={() => void handleBuyLabel(shipment)}
+                          >
+                            Buy Label
+                          </button>
                         </div>
 
                         {quoteWarning && (
@@ -643,9 +645,10 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                           </div>
                         )}
 
-                        {(shipment.labelState === 'generated' || shipment.trackingNumber || shipment.labelUrl) && (
-                          <div className="mt-3 rounded-shell bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                            <div className="flex flex-wrap items-center gap-3">
+                        <div className="mt-3 rounded-shell border border-driftwood/60 bg-white/80 p-3 text-sm">
+                          <p className="lux-label text-[10px] mb-2">Label</p>
+                          {shipment.labelUrl ? (
+                            <div className="flex flex-wrap items-center gap-3 text-emerald-800">
                               <span>
                                 {shipment.carrier || '-'} {shipment.service ? `| ${shipment.service}` : ''}
                               </span>
@@ -664,19 +667,31 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                               {shipment.labelCostAmountCents !== null && (
                                 <span>Cost: {formatCurrency(shipment.labelCostAmountCents, shipment.labelCurrency)}</span>
                               )}
-                              {shipment.labelUrl && (
-                                <a
-                                  href={shipment.labelUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="lux-button--ghost px-2 py-1 text-[10px]"
-                                >
-                                  Download PDF
-                                </a>
-                              )}
+                              <a
+                                href={shipment.labelUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="lux-button--ghost px-2 py-1 text-[10px]"
+                              >
+                                Download Label (PDF)
+                              </a>
                             </div>
-                          </div>
-                        )}
+                          ) : pendingRefresh ? (
+                            <div className="flex flex-wrap items-center gap-3 text-amber-800">
+                              <span>Label generating...</span>
+                              <button
+                                type="button"
+                                className="lux-button--ghost px-3 py-1 text-[10px]"
+                                onClick={() => void handleRefreshLabel(shipment)}
+                              >
+                                <RefreshCcw className="h-4 w-4" />
+                                Refresh
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-charcoal/70">No label purchased yet.</div>
+                          )}
+                        </div>
                       </div>
                     );
                   })

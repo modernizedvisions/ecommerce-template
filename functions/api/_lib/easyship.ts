@@ -565,8 +565,130 @@ const parseRatesFromResponse = (data: any): EasyshipRate[] => {
   return normalized;
 };
 
-const normalizeShipmentSnapshot = (payload: any): EasyshipShipmentSnapshot => {
-  const shipment = payload?.shipment || payload?.data?.shipment || payload?.data || payload || {};
+const toRecordArray = (value: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(value)) return value.filter((entry): entry is Record<string, unknown> => isRecord(entry));
+  if (isRecord(value)) return [value];
+  return [];
+};
+
+const collectUrlsFromUnknown = (value: unknown, depth = 0): string[] => {
+  if (depth > 4 || value === null || value === undefined) return [];
+  if (typeof value === 'string') {
+    const candidate = trimOrNull(value);
+    if (!candidate) return [];
+    return /^https?:\/\//i.test(candidate) ? [candidate] : [];
+  }
+  if (Array.isArray(value)) {
+    const urls: string[] = [];
+    for (const entry of value) {
+      urls.push(...collectUrlsFromUnknown(entry, depth + 1));
+    }
+    return urls;
+  }
+  if (!isRecord(value)) return [];
+
+  const urls: string[] = [];
+  for (const [key, nested] of Object.entries(value)) {
+    if (typeof nested === 'string') {
+      const normalizedKey = key.toLowerCase();
+      const candidate = trimOrNull(nested);
+      if (candidate && (normalizedKey.includes('url') || normalizedKey === 'href' || normalizedKey === 'link')) {
+        urls.push(candidate);
+      }
+      continue;
+    }
+    urls.push(...collectUrlsFromUnknown(nested, depth + 1));
+  }
+  return urls;
+};
+
+type ShipmentLabelBucket = {
+  name: string;
+  entries: Record<string, unknown>[];
+};
+
+const collectShipmentLabelBuckets = (shipment: Record<string, unknown>, payload: any): ShipmentLabelBucket[] => {
+  const buckets: ShipmentLabelBucket[] = [];
+  const appendBucket = (name: string, value: unknown) => {
+    const entries = toRecordArray(value);
+    if (entries.length) buckets.push({ name, entries });
+  };
+
+  appendBucket('shipment.documents', shipment.documents);
+  appendBucket('shipment.shipping_documents', shipment.shipping_documents);
+  appendBucket('shipment.labels', shipment.labels);
+  appendBucket('shipment.shipment_labels', shipment.shipment_labels);
+  appendBucket('shipment.label_files', shipment.label_files);
+  appendBucket('payload.documents', payload?.documents);
+  appendBucket('payload.shipping_documents', payload?.shipping_documents);
+  appendBucket('payload.labels', payload?.labels);
+  appendBucket('payload.shipment_labels', payload?.shipment_labels);
+  appendBucket('payload.label_files', payload?.label_files);
+
+  const batchCandidates = [payload?.batch, payload?.label_batch, payload?.data?.batch, payload?.data?.label_batch];
+  batchCandidates.forEach((batch, index) => {
+    if (!isRecord(batch)) return;
+    appendBucket(`batch[${index}].documents`, batch.documents);
+    appendBucket(`batch[${index}].shipping_documents`, batch.shipping_documents);
+    appendBucket(`batch[${index}].labels`, batch.labels);
+    appendBucket(`batch[${index}].shipment_labels`, batch.shipment_labels);
+    appendBucket(`batch[${index}].label_files`, batch.label_files);
+  });
+
+  return buckets;
+};
+
+const isPdfishUrl = (url: string): boolean =>
+  /\.pdf(?:$|[?#])/i.test(url) || /[?&](format|type)=pdf(?:[&#]|$)/i.test(url) || /\/pdf\//i.test(url);
+
+const isPdfishDocumentEntry = (entry: Record<string, unknown>, url: string): boolean => {
+  if (isPdfishUrl(url)) return true;
+  const formatHints = [
+    trimOrNull(entry.format),
+    trimOrNull(entry.mime_type),
+    trimOrNull(entry.content_type),
+    trimOrNull(entry.file_type),
+    trimOrNull(entry.document_type),
+    trimOrNull(entry.type),
+    trimOrNull(entry.name),
+  ]
+    .filter((value): value is string => !!value)
+    .join(' ')
+    .toLowerCase();
+  return formatHints.includes('pdf');
+};
+
+const pickLabelUrlFromBuckets = (buckets: ShipmentLabelBucket[]): string | null => {
+  const allCandidates: { url: string; pdfish: boolean }[] = [];
+  const seen = new Set<string>();
+  for (const bucket of buckets) {
+    for (const entry of bucket.entries) {
+      const urls = collectUrlsFromUnknown(entry);
+      for (const url of urls) {
+        if (seen.has(url)) continue;
+        seen.add(url);
+        allCandidates.push({ url, pdfish: isPdfishDocumentEntry(entry, url) });
+      }
+    }
+  }
+  return allCandidates.find((candidate) => candidate.pdfish)?.url || allCandidates[0]?.url || null;
+};
+
+const pickTextFromBuckets = (buckets: ShipmentLabelBucket[], keys: string[]): string | null => {
+  for (const bucket of buckets) {
+    for (const entry of bucket.entries) {
+      for (const key of keys) {
+        const text = trimOrNull(entry[key]);
+        if (text) return text;
+      }
+    }
+  }
+  return null;
+};
+
+const normalizeShipmentSnapshot = (payload: any, options?: { debug?: boolean }): EasyshipShipmentSnapshot => {
+  const shipmentRaw = payload?.shipment || payload?.data?.shipment || payload?.data || payload || {};
+  const shipment = isRecord(shipmentRaw) ? shipmentRaw : {};
   const label = shipment?.label || shipment?.shipping_label || payload?.label || payload?.data?.label || {};
   const selectedRate =
     shipment?.selected_rate ||
@@ -589,9 +711,12 @@ const normalizeShipmentSnapshot = (payload: any): EasyshipShipmentSnapshot => {
     trimOrNull(payload?.easyship_shipment_id) ||
     trimOrNull(payload?.shipment_id) ||
     '';
+  const labelBuckets = collectShipmentLabelBuckets(shipment, payload);
+  const labelUrlFromBuckets = pickLabelUrlFromBuckets(labelBuckets);
   const labelId =
     trimOrNull(label?.id) ||
     trimOrNull(shipment?.label_id) ||
+    pickTextFromBuckets(labelBuckets, ['id', 'label_id', 'document_id']) ||
     trimOrNull(payload?.label_id) ||
     null;
   const carrier =
@@ -607,12 +732,15 @@ const normalizeShipmentSnapshot = (payload: any): EasyshipShipmentSnapshot => {
   const trackingNumber =
     trimOrNull(label?.tracking_number) ||
     trimOrNull(shipment?.tracking_number) ||
+    (Array.isArray(shipment?.tracking_numbers) ? trimOrNull(shipment.tracking_numbers[0]) : null) ||
+    trimOrNull(selectedRate?.tracking_number) ||
     trimOrNull(payload?.tracking_number) ||
     null;
   const labelUrl =
     trimOrNull(label?.label_url) ||
     trimOrNull(label?.download_url) ||
     trimOrNull(shipment?.label_url) ||
+    labelUrlFromBuckets ||
     trimOrNull(payload?.label_url) ||
     null;
   const labelCostAmountCents =
@@ -626,6 +754,16 @@ const normalizeShipmentSnapshot = (payload: any): EasyshipShipmentSnapshot => {
     trimOrNull(selectedRate?.currency) ||
     trimOrNull(payload?.currency) ||
     'USD';
+
+  if (options?.debug) {
+    console.log('[easyship][debug] shipment label scan', {
+      hasLabelUrl: !!labelUrl,
+      hasLabelId: !!labelId,
+      hasTrackingNumber: !!trackingNumber,
+      shipmentTopKeys: Object.keys(shipment),
+      labelBucketsPresent: labelBuckets.map((bucket) => bucket.name),
+    });
+  }
 
   let labelState: 'pending' | 'generated' | 'failed' = 'pending';
   if (labelUrl) {
@@ -1200,6 +1338,7 @@ export async function createShipmentAndBuyLabel(
   if (maybeMock(env)) {
     return buildMockShipmentSnapshot(input);
   }
+  const debugEnabled = isEasyshipDebugEnabled(env);
 
   const payloadInput: EasyshipCreateShipmentRequest = {
     ...input,
@@ -1221,7 +1360,7 @@ export async function createShipmentAndBuyLabel(
   if (!Number.isFinite(input.dimensions.heightIn) || input.dimensions.heightIn <= 0) invalidDimensionsReason.push('heightIn');
   if (!Number.isFinite(input.dimensions.weightLb) || input.dimensions.weightLb <= 0) invalidDimensionsReason.push('weightLb');
 
-  if (isEasyshipDebugEnabled(env)) {
+  if (debugEnabled) {
     const [orderId, shipmentId] = (input.externalReference || '').split(':');
     const firstParcel =
       payload && typeof payload === 'object' && Array.isArray((payload as any).parcels)
@@ -1273,7 +1412,7 @@ export async function createShipmentAndBuyLabel(
     );
   }
   const created = await requestEasyship<any>(env, '/shipments', 'POST', payload);
-  const createSnapshot = normalizeShipmentSnapshot(created);
+  const createSnapshot = normalizeShipmentSnapshot(created, { debug: debugEnabled });
   const shipmentId = createSnapshot.shipmentId;
   if (!shipmentId) {
     throw new Error('Easyship create shipment response missing shipment id');
@@ -1290,7 +1429,7 @@ export async function createShipmentAndBuyLabel(
     ],
   };
 
-  if (isEasyshipDebugEnabled(env)) {
+  if (debugEnabled) {
     const batchPayloadShape = summarizeEasyshipPayloadShape(batchLabelPayload);
     console.log('[easyship][debug] label batch request preflight', {
       shipmentId,
@@ -1301,12 +1440,27 @@ export async function createShipmentAndBuyLabel(
     });
   }
 
-  await requestEasyship<any>(env, '/batches/labels', 'POST', batchLabelPayload);
+  const batchResponse = await requestEasyshipDetailed<any>(env, '/batches/labels', 'POST', batchLabelPayload);
+  if (debugEnabled) {
+    const batchData = batchResponse.data || {};
+    const batchId =
+      trimOrNull((batchData as any)?.batch_id) ||
+      trimOrNull((batchData as any)?.id) ||
+      trimOrNull((batchData as any)?.batch?.id) ||
+      null;
+    console.log('[easyship][debug] label batch response', {
+      shipmentId,
+      status: batchResponse.status,
+      responseTopKeys: batchResponse.responseTopKeys,
+      batchId,
+    });
+  }
+
   const refreshed = await requestEasyship<any>(env, `/shipments/${encodeURIComponent(shipmentId)}`, 'GET');
-  return normalizeShipmentSnapshot(refreshed);
+  return normalizeShipmentSnapshot(refreshed, { debug: debugEnabled });
 }
 
-export async function getEasyshipShipment(env: EasyshipEnv, shipmentId: string): Promise<EasyshipShipmentSnapshot> {
+export async function refreshEasyshipShipment(env: EasyshipEnv, shipmentId: string): Promise<EasyshipShipmentSnapshot> {
   if (maybeMock(env)) {
     return {
       shipmentId,
@@ -1322,7 +1476,11 @@ export async function getEasyshipShipment(env: EasyshipEnv, shipmentId: string):
     };
   }
   const data = await requestEasyship<any>(env, `/shipments/${encodeURIComponent(shipmentId)}`, 'GET');
-  return normalizeShipmentSnapshot(data);
+  return normalizeShipmentSnapshot(data, { debug: isEasyshipDebugEnabled(env) });
+}
+
+export async function getEasyshipShipment(env: EasyshipEnv, shipmentId: string): Promise<EasyshipShipmentSnapshot> {
+  return refreshEasyshipShipment(env, shipmentId);
 }
 
 export const normalizeRateForClient = (rate: EasyshipRate) => ({

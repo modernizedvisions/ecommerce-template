@@ -308,3 +308,30 @@ export async function adminBuyShipmentLabel(
     refreshed: data.refreshed === true,
   };
 }
+
+export async function adminFetchShipmentLabelStatus(
+  orderId: string,
+  shipmentId: string
+): Promise<{
+  shipment: OrderShipment | null;
+  shipments: OrderShipment[];
+  pendingRefresh: boolean;
+  refreshed?: boolean;
+}> {
+  const response = await adminFetch(
+    `/api/admin/orders/${encodeURIComponent(orderId)}/shipments/${encodeURIComponent(shipmentId)}/label-status`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    }
+  );
+  if (!response.ok) return failWithResponse(response, 'Failed to refresh shipment label status');
+  const data = await parseJson<any>(response);
+  return {
+    shipment: (data.shipment || null) as OrderShipment | null,
+    shipments: Array.isArray(data.shipments) ? (data.shipments as OrderShipment[]) : [],
+    pendingRefresh: !!data.pendingRefresh,
+    refreshed: data.refreshed === true,
+  };
+}

@@ -5,10 +5,10 @@ import {
   fetchEasyshipRates,
   filterAllowedRates,
   getAllowedCarriers,
-  getEasyshipShipment,
   isEasyshipDebugEnabled,
   normalizeRateForClient,
   pickCheapestRate,
+  refreshEasyshipShipment,
   type EasyshipRawResponseHints,
   type EasyshipRate,
   type EasyshipRateRequest,
@@ -123,8 +123,6 @@ const toEasyshipRateRequest = (
     declaredValueCents: item.declaredValueCents,
   })),
 });
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const persistQuotesCache = async (
   env: ShippingLabelsEnv,
@@ -256,7 +254,7 @@ export async function onRequestPost(
         );
       }
 
-      const refreshed = await getEasyshipShipment(context.env, shipment.easyshipShipmentId);
+      const refreshed = await refreshEasyshipShipment(context.env, shipment.easyshipShipmentId);
       await updateShipmentFromSnapshot(context.env, params.orderId, params.shipmentId, selectedQuoteId, refreshed, null);
       const shipments = await listOrderShipments(context.env.DB, params.orderId);
       const updated = shipments.find((entry) => entry.id === params.shipmentId) || null;
@@ -448,19 +446,6 @@ export async function onRequestPost(
     )
       .bind(selectedQuoteId, new Date().toISOString(), params.shipmentId, params.orderId)
       .run();
-
-    let snapshot = created;
-    if (snapshot.labelState === 'pending' && snapshot.shipmentId) {
-      for (let i = 0; i < 15; i += 1) {
-        await sleep(2000);
-        const polled = await getEasyshipShipment(context.env, snapshot.shipmentId);
-        snapshot = polled;
-        await updateShipmentFromSnapshot(context.env, params.orderId, params.shipmentId, selectedQuoteId, snapshot, null);
-        if (polled.labelState === 'generated' || polled.labelState === 'failed') {
-          break;
-        }
-      }
-    }
 
     const shipments = await listOrderShipments(context.env.DB, params.orderId);
     const updated = shipments.find((entry) => entry.id === params.shipmentId) || null;
