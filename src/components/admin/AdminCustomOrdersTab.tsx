@@ -7,6 +7,13 @@ import { AdminSectionHeader } from './AdminSectionHeader';
 import { AdminSaveButton } from './AdminSaveButton';
 import { adminUploadImageUnified } from '../../lib/api';
 import { formatEasternDateTime } from '../../lib/dates';
+import {
+  adminFetchCustomOrderQuotes,
+  adminFetchShippingSettings,
+  type CustomOrderQuoteDestination,
+  type ShipmentQuote,
+  type ShippingBoxPreset,
+} from '../../lib/adminShipping';
 
 interface AdminCustomOrdersTabProps {
   allCustomOrders: any[];
@@ -29,6 +36,130 @@ type CustomOrderImageState = {
   uploading: boolean;
   optimizing?: boolean;
   uploadError?: string | null;
+};
+
+type CustomOrderFormValues = {
+  customerName: string;
+  customerEmail: string;
+  description: string;
+  amount: string;
+  shipping: string;
+  showOnSoldProducts: boolean;
+};
+
+type ParcelQuoteDraft = {
+  boxPresetId: string;
+  useCustom: boolean;
+  customLengthIn: string;
+  customWidthIn: string;
+  customHeightIn: string;
+  weightLb: string;
+};
+
+type QuoteDimensions = {
+  lengthIn: number;
+  widthIn: number;
+  heightIn: number;
+  weightLb: number;
+};
+
+const defaultQuoteDraft: ParcelQuoteDraft = {
+  boxPresetId: '',
+  useCustom: false,
+  customLengthIn: '',
+  customWidthIn: '',
+  customHeightIn: '',
+  weightLb: '',
+};
+
+const trimOrNull = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+const toPositiveNumberOrNull = (value: unknown): number | null => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return numeric;
+};
+
+const normalizeAmountCents = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.round(parsed * 100);
+};
+
+const formatMoney = (amountCents: number, currency = 'USD') => {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: (currency || 'USD').toUpperCase(),
+    }).format(amountCents / 100);
+  } catch {
+    return `$${(amountCents / 100).toFixed(2)}`;
+  }
+};
+
+const parseInitialDraftDestination = (draft: any): CustomOrderQuoteDestination | null => {
+  if (!draft || typeof draft !== 'object') return null;
+  const source = draft.shippingAddress && typeof draft.shippingAddress === 'object' ? draft.shippingAddress : draft;
+  const line1 = trimOrNull(source.line1 || source.shippingLine1 || source.shipping_line1);
+  const city = trimOrNull(source.city || source.shippingCity || source.shipping_city);
+  const state = trimOrNull(source.state || source.shippingState || source.shipping_state);
+  const postalCode = trimOrNull(
+    source.postalCode || source.postal_code || source.shippingPostalCode || source.shipping_postal_code
+  );
+  const country = trimOrNull(source.country || source.shippingCountry || source.shipping_country);
+  const phone = trimOrNull(source.phone || source.shippingPhone || source.shipping_phone);
+  const line2 = trimOrNull(source.line2 || source.shippingLine2 || source.shipping_line2);
+  const name = trimOrNull(source.name || source.shippingName || source.shipping_name);
+  const email = trimOrNull(source.email || source.customerEmail || source.customer_email);
+  if (!line1 && !city && !state && !postalCode && !country && !phone) return null;
+  return {
+    name,
+    email,
+    phone,
+    line1,
+    line2,
+    city,
+    state,
+    postalCode,
+    country: country || 'US',
+  };
+};
+
+const getDestinationMissingFields = (destination: CustomOrderQuoteDestination | null): string[] => {
+  const source = destination || {};
+  const missing: string[] = [];
+  if (!trimOrNull(source.line1)) missing.push('line1');
+  if (!trimOrNull(source.city)) missing.push('city');
+  if (!trimOrNull(source.state)) missing.push('state');
+  if (!trimOrNull(source.postalCode)) missing.push('postalCode');
+  if (!trimOrNull(source.country)) missing.push('country');
+  if (!trimOrNull(source.phone)) missing.push('phone');
+  return missing;
+};
+
+const getMissingShipFromFields = (shipFrom: {
+  shipFromName: string;
+  shipFromAddress1: string;
+  shipFromCity: string;
+  shipFromState: string;
+  shipFromPostal: string;
+  shipFromCountry: string;
+} | null): string[] => {
+  if (!shipFrom) return ['shipFrom'];
+  const missing: string[] = [];
+  if (!shipFrom.shipFromName.trim()) missing.push('name');
+  if (!shipFrom.shipFromAddress1.trim()) missing.push('address1');
+  if (!shipFrom.shipFromCity.trim()) missing.push('city');
+  if (!shipFrom.shipFromState.trim()) missing.push('state');
+  if (!shipFrom.shipFromPostal.trim()) missing.push('postal');
+  if (!shipFrom.shipFromCountry.trim()) missing.push('country');
+  return missing;
 };
 
 export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
@@ -69,6 +200,16 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
   const [isArchiving, setIsArchiving] = useState(false);
   const [archiveNotice, setArchiveNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [sendingPaymentLinks, setSendingPaymentLinks] = useState<Set<string>>(new Set());
+  const [quoteBoxPresets, setQuoteBoxPresets] = useState<ShippingBoxPreset[]>([]);
+  const [quoteDraft, setQuoteDraft] = useState<ParcelQuoteDraft>(defaultQuoteDraft);
+  const [quoteDestination, setQuoteDestination] = useState<CustomOrderQuoteDestination | null>(null);
+  const [quoteRates, setQuoteRates] = useState<ShipmentQuote[]>([]);
+  const [quoteCheapestId, setQuoteCheapestId] = useState<string | null>(null);
+  const [quoteBusy, setQuoteBusy] = useState(false);
+  const [quoteWarning, setQuoteWarning] = useState('');
+  const [quoteError, setQuoteError] = useState('');
+  const [quoteSuccess, setQuoteSuccess] = useState('');
+  const [shipFromMissingFields, setShipFromMissingFields] = useState<string[]>([]);
   const draftDefaults = useMemo(() => {
     if (!initialDraft) return undefined;
     const draftShipping =
@@ -85,7 +226,7 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
     };
   }, [initialDraft]);
 
-  const { register, handleSubmit, reset, formState, setValue } = useForm({
+  const { register, handleSubmit, reset, formState, setValue, setFocus, watch } = useForm<CustomOrderFormValues>({
     defaultValues: {
       customerName: '',
       customerEmail: '',
@@ -111,6 +252,13 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
         showOnSoldProducts: false,
       };
       reset(mappedDraft);
+      setQuoteRates([]);
+      setQuoteCheapestId(null);
+      setQuoteWarning('');
+      setQuoteError('');
+      setQuoteSuccess('');
+      setQuoteDraft(defaultQuoteDraft);
+      setQuoteDestination(parseInitialDraftDestination(initialDraft));
       setIsModalOpen(true);
       onDraftConsumed?.();
     }
@@ -127,8 +275,54 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
         showOnSoldProducts: false,
       });
       setDraftImage(buildImageState(null));
+      setQuoteRates([]);
+      setQuoteCheapestId(null);
+      setQuoteBusy(false);
+      setQuoteWarning('');
+      setQuoteError('');
+      setQuoteSuccess('');
+      setShipFromMissingFields([]);
+      setQuoteDestination(null);
+      setQuoteDraft(defaultQuoteDraft);
     }
   }, [isModalOpen, reset]);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    let cancelled = false;
+    const loadShippingQuoteSettings = async () => {
+      try {
+        const settings = await adminFetchShippingSettings();
+        if (cancelled) return;
+        setQuoteBoxPresets(settings.boxPresets);
+        setShipFromMissingFields(getMissingShipFromFields(settings.shipFrom));
+        setQuoteDraft((prev) => {
+          const firstPreset = settings.boxPresets[0];
+          const existingPreset = prev.boxPresetId
+            ? settings.boxPresets.find((preset) => preset.id === prev.boxPresetId)
+            : null;
+          const targetPreset = existingPreset || firstPreset || null;
+          const fallbackWeight =
+            targetPreset && targetPreset.defaultWeightLb !== null && targetPreset.defaultWeightLb !== undefined
+              ? String(targetPreset.defaultWeightLb)
+              : prev.weightLb || '1';
+          return {
+            ...prev,
+            boxPresetId: prev.boxPresetId || targetPreset?.id || '',
+            weightLb: prev.weightLb || fallbackWeight,
+          };
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setShipFromMissingFields(['shipFrom']);
+        setQuoteError(err instanceof Error ? err.message : 'Failed to load shipping presets.');
+      }
+    };
+    void loadShippingQuoteSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [isModalOpen]);
 
   useEffect(() => {
     if (!archiveNotice) return;
@@ -304,6 +498,93 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
     if (typeof order.shipping_cents === 'number') return order.shipping_cents;
     return 0;
   };
+  const watchedAmount = watch('amount');
+  const watchedDescription = watch('description');
+  const watchedCustomerName = watch('customerName');
+  const watchedCustomerEmail = watch('customerEmail');
+  const destinationMissingFields = useMemo(() => getDestinationMissingFields(quoteDestination), [quoteDestination]);
+  const canGetQuotes = destinationMissingFields.length === 0 && shipFromMissingFields.length === 0;
+
+  const setQuoteDraftPatch = (patch: Partial<ParcelQuoteDraft>) => {
+    setQuoteDraft((prev) => ({ ...prev, ...patch }));
+  };
+
+  const resolveQuoteDimensions = (): QuoteDimensions | null => {
+    const weightLb = toPositiveNumberOrNull(quoteDraft.weightLb);
+    if (weightLb === null) return null;
+
+    if (quoteDraft.useCustom) {
+      const lengthIn = toPositiveNumberOrNull(quoteDraft.customLengthIn);
+      const widthIn = toPositiveNumberOrNull(quoteDraft.customWidthIn);
+      const heightIn = toPositiveNumberOrNull(quoteDraft.customHeightIn);
+      if (lengthIn === null || widthIn === null || heightIn === null) return null;
+      return { lengthIn, widthIn, heightIn, weightLb };
+    }
+
+    const preset = quoteBoxPresets.find((entry) => entry.id === quoteDraft.boxPresetId);
+    if (!preset) return null;
+    return {
+      lengthIn: Number(preset.lengthIn),
+      widthIn: Number(preset.widthIn),
+      heightIn: Number(preset.heightIn),
+      weightLb,
+    };
+  };
+
+  const handleGetQuotesForCustomOrder = async () => {
+    setQuoteError('');
+    setQuoteWarning('');
+    setQuoteSuccess('');
+    if (!canGetQuotes) {
+      if (destinationMissingFields.length > 0) {
+        setQuoteError('Add a shipping address to get quotes.');
+      } else if (shipFromMissingFields.length > 0) {
+        setQuoteError('Shipping settings are incomplete. Update ship-from settings before requesting quotes.');
+      }
+      return;
+    }
+
+    const dimensions = resolveQuoteDimensions();
+    if (!dimensions) {
+      setQuoteError('Enter valid parcel dimensions and weight to get quotes.');
+      return;
+    }
+
+    setQuoteBusy(true);
+    try {
+      const quoted = await adminFetchCustomOrderQuotes({
+        destination: {
+          ...quoteDestination,
+          name: trimOrNull(quoteDestination?.name) || trimOrNull(watchedCustomerName),
+          email: trimOrNull(quoteDestination?.email) || trimOrNull(watchedCustomerEmail),
+          country: trimOrNull(quoteDestination?.country) || 'US',
+        },
+        dimensions,
+        amountCents: normalizeAmountCents(watchedAmount || ''),
+        description: trimOrNull(watchedDescription) || 'Custom order',
+      });
+      setQuoteRates(quoted.rates);
+      setQuoteCheapestId(quoted.cheapest?.id || null);
+      setQuoteWarning(quoted.warning || '');
+      setQuoteSuccess(quoted.rates.length ? 'Quotes fetched.' : '');
+    } catch (err) {
+      setQuoteRates([]);
+      setQuoteCheapestId(null);
+      setQuoteError(err instanceof Error ? err.message : 'Failed to fetch quotes.');
+    } finally {
+      setQuoteBusy(false);
+    }
+  };
+
+  const handleCopyShippingFromQuote = (rate: ShipmentQuote) => {
+    setValue('shipping', (rate.amountCents / 100).toFixed(2), {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    setFocus('shipping');
+    setQuoteSuccess(`Copied ${formatMoney(rate.amountCents, rate.currency)} to Shipping.`);
+  };
 
   return (
     <div className="lux-card p-6 space-y-4">
@@ -317,6 +598,13 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
             type="button"
             onClick={() => {
               reset(draftDefaults || { customerName: '', customerEmail: '', description: '', amount: '' });
+              setQuoteDestination(parseInitialDraftDestination(draftDefaults || null));
+              setQuoteRates([]);
+              setQuoteCheapestId(null);
+              setQuoteWarning('');
+              setQuoteError('');
+              setQuoteSuccess('');
+              setQuoteDraft(defaultQuoteDraft);
               setIsModalOpen(true);
             }}
             className="lux-button px-4 py-2 text-[10px]"
@@ -964,6 +1252,182 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
                   className="lux-input text-sm"
                 />
               </div>
+
+              <section className="lux-panel p-4 space-y-4">
+                <div>
+                  <p className="lux-label text-[10px] mb-1">Get Quotes to Determine Shipping</p>
+                  <p className="text-sm text-charcoal/70">
+                    Generate shipping quotes here. Purchase the label after payment is received from the Orders table.
+                  </p>
+                </div>
+
+                <div className="w-full max-w-[520px] space-y-3">
+                  <div>
+                    <label className="lux-label mb-2 block">Box Preset</label>
+                    <select
+                      className="lux-input w-full text-[11px] uppercase tracking-[0.2em] font-semibold"
+                      disabled={quoteDraft.useCustom}
+                      value={quoteDraft.boxPresetId}
+                      onChange={(e) => {
+                        const nextPresetId = e.target.value;
+                        const nextPreset = quoteBoxPresets.find((preset) => preset.id === nextPresetId);
+                        setQuoteDraftPatch({
+                          boxPresetId: nextPresetId,
+                          weightLb:
+                            quoteDraft.weightLb ||
+                            (nextPreset?.defaultWeightLb !== null && nextPreset?.defaultWeightLb !== undefined
+                              ? String(nextPreset.defaultWeightLb)
+                              : quoteDraft.weightLb),
+                        });
+                      }}
+                    >
+                      <option value="">Select preset</option>
+                      {quoteBoxPresets.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs text-charcoal/80">
+                    <input
+                      type="checkbox"
+                      checked={quoteDraft.useCustom}
+                      onChange={(e) => setQuoteDraftPatch({ useCustom: e.target.checked })}
+                    />
+                    Use Custom Dimensions
+                  </label>
+
+                  {quoteDraft.useCustom && (
+                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="lux-label mb-2 block">Length (in)</label>
+                        <input
+                          className="lux-input w-full min-w-0"
+                          value={quoteDraft.customLengthIn}
+                          onChange={(e) => setQuoteDraftPatch({ customLengthIn: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="lux-label mb-2 block">Width (in)</label>
+                        <input
+                          className="lux-input w-full min-w-0"
+                          value={quoteDraft.customWidthIn}
+                          onChange={(e) => setQuoteDraftPatch({ customWidthIn: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="lux-label mb-2 block">Height (in)</label>
+                        <input
+                          className="lux-input w-full min-w-0"
+                          value={quoteDraft.customHeightIn}
+                          onChange={(e) => setQuoteDraftPatch({ customHeightIn: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="w-full max-w-[240px]">
+                      <label className="lux-label mb-2 block">Weight (lb)</label>
+                      <input
+                        className="lux-input w-full"
+                        value={quoteDraft.weightLb}
+                        onChange={(e) => setQuoteDraftPatch({ weightLb: e.target.value })}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="lux-button--ghost px-3 py-2 text-[10px] disabled:opacity-60"
+                      disabled={quoteBusy || !canGetQuotes}
+                      onClick={() => void handleGetQuotesForCustomOrder()}
+                    >
+                      {quoteBusy ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          GET QUOTES
+                        </span>
+                      ) : (
+                        'GET QUOTES'
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {destinationMissingFields.length > 0 && (
+                  <div className="rounded-shell border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Add a shipping address to get quotes.
+                  </div>
+                )}
+                {shipFromMissingFields.length > 0 && (
+                  <div className="rounded-shell border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Shipping settings are incomplete. Update ship-from settings before requesting quotes.
+                  </div>
+                )}
+                {quoteError && (
+                  <div className="rounded-shell border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {quoteError}
+                  </div>
+                )}
+                {quoteWarning && (
+                  <div className="rounded-shell border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {quoteWarning}
+                  </div>
+                )}
+                {quoteSuccess && (
+                  <div className="rounded-shell border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    {quoteSuccess}
+                  </div>
+                )}
+
+                <div className="rounded-shell border border-driftwood/60 bg-white/80 p-3">
+                  <p className="lux-label text-[10px] mb-2">Quotes</p>
+                  {quoteRates.length === 0 ? (
+                    <div className="text-sm text-charcoal/60">
+                      No quotes yet. Configure parcel details and click GET QUOTES.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {quoteRates.map((rate) => {
+                        const isCheapest = quoteCheapestId === rate.id;
+                        return (
+                          <div
+                            key={rate.id}
+                            className={`flex flex-wrap items-center justify-between gap-2 rounded-shell border px-3 py-2 text-sm ${
+                              isCheapest ? 'border-emerald-300 bg-emerald-50/40' : 'border-driftwood/60'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="font-medium text-charcoal">
+                                {rate.carrier} - {rate.service}
+                              </div>
+                              <div className="text-xs text-charcoal/70">
+                                {rate.etaDaysMin !== null && rate.etaDaysMax !== null
+                                  ? `ETA ${rate.etaDaysMin}-${rate.etaDaysMax}d`
+                                  : 'ETA unavailable'}
+                                {isCheapest ? ' • Cheapest' : ''}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-charcoal">
+                                {formatMoney(rate.amountCents, rate.currency)}
+                              </span>
+                              <button
+                                type="button"
+                                className="lux-button--ghost px-3 py-1 text-[10px]"
+                                onClick={() => handleCopyShippingFromQuote(rate)}
+                              >
+                                Copy to Shipping
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </section>
 
               <div className="flex justify-end gap-3 pt-2">
                 <button

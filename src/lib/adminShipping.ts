@@ -69,6 +69,35 @@ export type ShipmentQuoteDebugHints = {
   errorCode: string | null;
 };
 
+export type CustomOrderQuoteDestination = {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+};
+
+export type CustomOrderQuoteRequest = {
+  destination: CustomOrderQuoteDestination;
+  dimensions: {
+    lengthIn: number;
+    widthIn: number;
+    heightIn: number;
+    weightLb: number;
+  };
+  amountCents?: number | null;
+  description?: string | null;
+  items?: Array<{
+    description?: string | null;
+    quantity?: number | null;
+    declaredValueCents?: number | null;
+  }>;
+};
+
 const parseJson = async <T>(response: Response): Promise<T> => {
   const data = (await response.json().catch(() => null)) as T | null;
   if (!data) throw new Error('Response was not valid JSON');
@@ -276,6 +305,38 @@ export async function adminFetchShipmentQuotes(
           }
         : null,
     shipments: Array.isArray(data.shipments) ? (data.shipments as OrderShipment[]) : [],
+  };
+}
+
+export async function adminFetchCustomOrderQuotes(payload: CustomOrderQuoteRequest): Promise<{
+  rates: ShipmentQuote[];
+  cheapest: ShipmentQuote | null;
+  warning: string | null;
+  rawResponseHints: ShipmentQuoteDebugHints | null;
+}> {
+  const response = await adminFetch('/api/admin/custom-orders/quotes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) return failWithResponse(response, 'Failed to fetch custom order quotes');
+  const data = await parseJson<any>(response);
+  return {
+    rates: Array.isArray(data.rates) ? (data.rates as ShipmentQuote[]) : [],
+    cheapest: data?.cheapest && typeof data.cheapest === 'object' ? (data.cheapest as ShipmentQuote) : null,
+    warning: typeof data.warning === 'string' ? data.warning : null,
+    rawResponseHints:
+      data?.rawResponseHints &&
+      typeof data.rawResponseHints === 'object' &&
+      typeof data.rawResponseHints.status === 'number' &&
+      typeof data.rawResponseHints.hasError === 'boolean'
+        ? {
+            status: data.rawResponseHints.status,
+            hasError: data.rawResponseHints.hasError,
+            errorCode:
+              typeof data.rawResponseHints.errorCode === 'string' ? data.rawResponseHints.errorCode : null,
+          }
+        : null,
   };
 }
 

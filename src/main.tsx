@@ -9,6 +9,7 @@ import { AboutPage } from './pages/AboutPage';
 import { TermsPage } from './pages/TermsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
+import { EmailListPage } from './pages/EmailListPage';
 import CustomOrdersPage from './pages/CustomOrdersPage';
 import { ScrollToTop } from './components/ScrollToTop';
 import { Toaster } from 'sonner';
@@ -36,6 +37,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="product/:productId" element={<ProductDetailPage />} />
           <Route path="gallery" element={<GalleryPage />} />
           <Route path="custom-orders" element={<CustomOrdersPage />} />
+          <Route path="join" element={<EmailListPage />} />
           <Route path="about" element={<AboutPage />} />
           <Route path="terms" element={<TermsPage />} />
           <Route path="privacy" element={<PrivacyPage />} />

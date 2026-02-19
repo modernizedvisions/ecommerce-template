@@ -26,6 +26,7 @@ import { OrderDetailsModal } from '../components/admin/OrderDetailsModal';
 import { AdminPromotionsTab } from '../components/admin/AdminPromotionsTab';
 import { AdminShippingSettingsTab } from '../components/admin/AdminShippingSettingsTab';
 import { ShippingLabelsModal } from '../components/admin/ShippingLabelsModal';
+import { AdminEmailListTab } from '../components/admin/AdminEmailListTab';
 import { toast } from 'sonner';
 import {
   getAdminCustomOrders,
@@ -35,6 +36,7 @@ import {
   archiveAdminCustomOrder,
 } from '../lib/db/customOrders';
 import type { AdminCustomOrder } from '../lib/db/customOrders';
+import { clearStoredAdminPassword } from '../lib/emailListApi';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 export type ProductFormState = {
@@ -144,7 +146,16 @@ const AdminTabBadge = ({ count, isActive }: AdminTabBadgeProps) => {
   );
 };
 
-type AdminTabKey = 'orders' | 'shop' | 'messages' | 'customOrders' | 'images' | 'sold' | 'promotions' | 'settings';
+type AdminTabKey =
+  | 'orders'
+  | 'shop'
+  | 'messages'
+  | 'customOrders'
+  | 'images'
+  | 'sold'
+  | 'promotions'
+  | 'settings'
+  | 'emailList';
 
 const ADMIN_TAB_TO_PATH: Record<AdminTabKey, string> = {
   orders: '/admin/customers',
@@ -155,6 +166,7 @@ const ADMIN_TAB_TO_PATH: Record<AdminTabKey, string> = {
   sold: '/admin/sold',
   promotions: '/admin/promotions',
   settings: '/admin/settings',
+  emailList: '/admin/email-list',
 };
 
 const ADMIN_TABS: Array<{ key: AdminTabKey; label: string; badge?: number }> = [
@@ -165,6 +177,7 @@ const ADMIN_TABS: Array<{ key: AdminTabKey; label: string; badge?: number }> = [
   { key: 'customOrders', label: 'Custom Orders' },
   { key: 'images', label: 'Images' },
   { key: 'settings', label: 'Settings' },
+  { key: 'emailList', label: 'Email List' },
   { key: 'sold', label: 'Sold Products' },
 ];
 
@@ -176,6 +189,7 @@ const resolveTabFromPath = (pathname: string): AdminTabKey => {
   if (pathname.startsWith('/admin/sold')) return 'sold';
   if (pathname.startsWith('/admin/promotions')) return 'promotions';
   if (pathname.startsWith('/admin/settings')) return 'settings';
+  if (pathname.startsWith('/admin/email-list')) return 'emailList';
   if (pathname.startsWith('/admin/customers') || pathname.startsWith('/admin/orders')) return 'orders';
   return 'orders';
 };
@@ -360,6 +374,7 @@ export function AdminPage() {
         console.debug('[admin auth] logout request failed', error);
       }
     } finally {
+      clearStoredAdminPassword();
       window.location.href = '/admin';
     }
   };
@@ -1259,6 +1274,8 @@ export function AdminPage() {
         {activeTab === 'promotions' && <AdminPromotionsTab />}
 
         {activeTab === 'settings' && <AdminShippingSettingsTab />}
+
+        {activeTab === 'emailList' && <AdminEmailListTab />}
 
         {activeTab === 'customOrders' && (
           <AdminCustomOrdersTab

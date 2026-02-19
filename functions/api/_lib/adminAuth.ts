@@ -14,6 +14,7 @@ type D1Database = {
 // - D1 binding: DB
 export type AdminAuthEnv = {
   DB: D1Database;
+  ADMIN_PASSWORD?: string;
   ADMIN_PASSWORD_SALT_B64?: string;
   ADMIN_PASSWORD_HASH_B64?: string;
   ADMIN_PASSWORD_ITERS?: string;
@@ -223,10 +224,47 @@ export const setCookieHeader = (name: string, value: string, maxAgeSeconds: numb
 export const clearCookieHeader = (name: string): string =>
   `${name}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
 
-export const requireAdmin = async (request: Request, env: AdminAuthEnv): Promise<Response | null> => {
+export type RequireAdminOptions = {
+  log?: boolean;
+  requireHeaderPassword?: boolean;
+};
+
+const isHeaderPasswordValid = (request: Request, env: AdminAuthEnv): boolean => {
+  const expected = typeof env.ADMIN_PASSWORD === 'string' ? env.ADMIN_PASSWORD : '';
+  if (!expected) return false;
+  const providedRaw = request.headers.get('x-admin-password');
+  const provided = typeof providedRaw === 'string' ? providedRaw.trim() : '';
+  if (!provided) return false;
+  return provided === expected;
+};
+
+const unauthorized = (): Response => Response.json({ ok: false, code: 'ADMIN_UNAUTH' }, { status: 401 });
+
+export const requireAdmin = async (
+  request: Request,
+  env: AdminAuthEnv,
+  options?: RequireAdminOptions
+): Promise<Response | null> => {
+  const mustUseHeaderPassword = options?.requireHeaderPassword === true;
+
+  if (mustUseHeaderPassword) {
+    if (isHeaderPasswordValid(request, env)) return null;
+    if (options?.log) {
+      console.warn('[admin auth] unauthorized header-based request');
+    }
+    return unauthorized();
+  }
+
+  if (isHeaderPasswordValid(request, env)) {
+    return null;
+  }
+
   const session = await getAdminSession(env, request);
   if (!session) {
-    return Response.json({ ok: false, code: 'ADMIN_UNAUTH' }, { status: 401 });
+    if (options?.log) {
+      console.warn('[admin auth] unauthorized session-based request');
+    }
+    return unauthorized();
   }
   return null;
 };
