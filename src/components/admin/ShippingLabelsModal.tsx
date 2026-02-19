@@ -458,13 +458,47 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                       <div key={shipment.id} className="lux-panel p-4">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <h4 className="font-semibold text-charcoal">Parcel #{shipment.parcelIndex}</h4>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             {busyLabel && (
                               <span className="inline-flex items-center gap-1 text-xs text-charcoal/70">
                                 <Loader2 className="h-3 w-3 animate-spin" />
                                 {busyLabel}
                               </span>
                             )}
+                            {shipment.labelUrl ? (
+                              <a
+                                href={shipment.labelUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="lux-button--ghost px-3 py-2 text-[10px]"
+                              >
+                                Download Label (PDF)
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                title="You have not purchased a label yet."
+                                disabled
+                                className="lux-button--ghost px-3 py-2 text-[10px] opacity-50 cursor-not-allowed"
+                              >
+                                Download Label (PDF)
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="lux-button--ghost px-3 py-2 text-[10px]"
+                              onClick={() => void handleGetQuotes(shipment)}
+                            >
+                              Get Quotes
+                            </button>
+                            <button
+                              type="button"
+                              className="lux-button px-3 py-2 text-[10px]"
+                              disabled={!shipFromReady || !!quoteWarning || !canBuyLabel}
+                              onClick={() => void handleBuyLabel(shipment)}
+                            >
+                              Buy Label
+                            </button>
                             {canRemove && (
                               <button
                                 type="button"
@@ -478,7 +512,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                         </div>
 
                         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                          <div className="w-full max-w-[320px] space-y-3">
+                          <div className="w-full max-w-[520px] space-y-3">
                             <div>
                               <label className="lux-label mb-2 block">Box Preset</label>
                               <select
@@ -507,11 +541,11 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
 
                             {draft.useCustom && (
                               <div className="w-full">
-                                <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+                                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
                                   <div>
                                     <label className="lux-label mb-2 block">Length (in)</label>
                                     <input
-                                      className="lux-input w-full"
+                                      className="lux-input w-full min-w-0"
                                       value={draft.customLengthIn}
                                       onChange={(e) => updateDraft(shipment.id, { customLengthIn: e.target.value })}
                                     />
@@ -519,7 +553,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                   <div>
                                     <label className="lux-label mb-2 block">Width (in)</label>
                                     <input
-                                      className="lux-input w-full"
+                                      className="lux-input w-full min-w-0"
                                       value={draft.customWidthIn}
                                       onChange={(e) => updateDraft(shipment.id, { customWidthIn: e.target.value })}
                                     />
@@ -527,7 +561,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                   <div>
                                     <label className="lux-label mb-2 block">Height (in)</label>
                                     <input
-                                      className="lux-input w-full"
+                                      className="lux-input w-full min-w-0"
                                       value={draft.customHeightIn}
                                       onChange={(e) => updateDraft(shipment.id, { customHeightIn: e.target.value })}
                                     />
@@ -536,39 +570,27 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                               </div>
                             )}
 
-                            <div className="w-full max-w-[220px]">
-                              <label className="lux-label mb-2 block">Weight (lb)</label>
-                              <input
-                                className="lux-input w-full"
-                                value={draft.weightLb}
-                                onChange={(e) => updateDraft(shipment.id, { weightLb: e.target.value })}
-                              />
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                              <div className="w-full max-w-[240px]">
+                                <label className="lux-label mb-2 block">Weight (lb)</label>
+                                <input
+                                  className="lux-input w-full"
+                                  value={draft.weightLb}
+                                  onChange={(e) => updateDraft(shipment.id, { weightLb: e.target.value })}
+                                />
+                              </div>
+                              {draft.useCustom && (
+                                <button
+                                  type="button"
+                                  className="lux-button--ghost px-3 py-2 text-[10px]"
+                                  onClick={() =>
+                                    void withShipmentBusy(shipment.id, 'saving', async () => persistShipmentDraft(shipment.id))
+                                  }
+                                >
+                                  Save Dimensions
+                                </button>
+                              )}
                             </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:w-auto">
-                            <button
-                              type="button"
-                              className="lux-button--ghost px-3 py-2 text-[10px] lg:self-end"
-                              onClick={() => void withShipmentBusy(shipment.id, 'saving', async () => persistShipmentDraft(shipment.id))}
-                            >
-                              Save Parcel
-                            </button>
-                            <button
-                              type="button"
-                              className="lux-button--ghost px-3 py-2 text-[10px] lg:self-end"
-                              onClick={() => void handleGetQuotes(shipment)}
-                            >
-                              Get Quotes
-                            </button>
-                            <button
-                              type="button"
-                              className="lux-button px-3 py-2 text-[10px] lg:self-end"
-                              disabled={!shipFromReady || !!quoteWarning || !canBuyLabel}
-                              onClick={() => void handleBuyLabel(shipment)}
-                            >
-                              Buy Label
-                            </button>
                           </div>
                         </div>
 
@@ -625,16 +647,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <p className="lux-label text-[10px]">Label</p>
                             <div className="flex flex-wrap items-center justify-end gap-2">
-                              {shipment.labelUrl ? (
-                                <a
-                                  href={shipment.labelUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="lux-button--ghost px-3 py-1 text-[10px]"
-                                >
-                                  Download Label (PDF)
-                                </a>
-                              ) : pendingRefresh ? (
+                              {pendingRefresh ? (
                                 <>
                                   <span className="text-xs text-amber-800">Generating...</span>
                                   <button
@@ -646,9 +659,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                     Refresh
                                   </button>
                                 </>
-                              ) : (
-                                <span className="text-xs text-charcoal/60">No label yet</span>
-                              )}
+                              ) : <span className="text-xs text-charcoal/60">{shipment.labelUrl ? 'Label ready' : 'No label yet'}</span>}
                             </div>
                           </div>
                           {(shipment.labelUrl || shipment.trackingNumber || shipment.labelCostAmountCents !== null) && (
