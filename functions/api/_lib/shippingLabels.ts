@@ -59,6 +59,7 @@ type OrderShipmentRow = {
   error_message: string | null;
   created_at: string | null;
   purchased_at: string | null;
+  tracking_email_sent_at: string | null;
   updated_at: string | null;
   box_name?: string | null;
   box_length_in?: number | null;
@@ -256,6 +257,17 @@ export async function ensureShippingLabelsSchema(db: D1Database): Promise<void> 
       await db.prepare(`ALTER TABLE orders ADD COLUMN shipping_phone TEXT;`).run();
     }
   }
+
+  const shipmentTable = await db
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'order_shipments' LIMIT 1;`)
+    .first<{ name: string }>();
+  if (shipmentTable?.name) {
+    const shipmentColumns = await db.prepare(`PRAGMA table_info(order_shipments);`).all<{ name: string }>();
+    const shipmentColumnNames = new Set((shipmentColumns.results || []).map((column) => column.name));
+    if (!shipmentColumnNames.has('tracking_email_sent_at')) {
+      await db.prepare(`ALTER TABLE order_shipments ADD COLUMN tracking_email_sent_at TEXT;`).run();
+    }
+  }
 }
 
 export type ShipFromSettings = {
@@ -305,6 +317,7 @@ export type OrderShipment = {
   errorMessage: string | null;
   createdAt: string | null;
   purchasedAt: string | null;
+  trackingEmailSentAt: string | null;
   updatedAt: string | null;
   effectiveLengthIn: number | null;
   effectiveWidthIn: number | null;
@@ -447,6 +460,7 @@ export function mapOrderShipmentRow(row: OrderShipmentRow): OrderShipment {
     errorMessage: row.error_message,
     createdAt: row.created_at ?? null,
     purchasedAt: row.purchased_at ?? null,
+    trackingEmailSentAt: row.tracking_email_sent_at ?? null,
     updatedAt: row.updated_at ?? null,
     effectiveLengthIn,
     effectiveWidthIn,
@@ -479,6 +493,7 @@ export async function listOrderShipments(db: D1Database, orderId: string): Promi
          os.error_message,
          os.created_at,
          os.purchased_at,
+         os.tracking_email_sent_at,
          os.updated_at,
          bp.name AS box_name,
          bp.length_in AS box_length_in,
@@ -520,6 +535,7 @@ export async function getOrderShipment(db: D1Database, orderId: string, shipment
          os.error_message,
          os.created_at,
          os.purchased_at,
+         os.tracking_email_sent_at,
          os.updated_at,
          bp.name AS box_name,
          bp.length_in AS box_length_in,

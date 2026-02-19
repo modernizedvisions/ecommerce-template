@@ -30,6 +30,7 @@ import {
   validateShipFrom,
   type ShippingLabelsEnv,
 } from '../../../../../_lib/shippingLabels';
+import { maybeSendTrackingEmail } from '../../../../../_lib/maybeSendTrackingEmail';
 
 type CacheRow = {
   rates_json: string;
@@ -232,6 +233,7 @@ export async function onRequestPost(
     const body = (await context.request.json().catch(() => null)) as Record<string, unknown> | null;
     const refresh = body?.refresh === true;
     let selectedQuoteId = trimOrNull(body?.quoteSelectedId) || shipment.quoteSelectedId || null;
+    const previousTrackingNumber = shipment.trackingNumber;
 
     if (shipment.labelState === 'generated' || shipment.purchasedAt) {
       if (!refresh) {
@@ -256,6 +258,21 @@ export async function onRequestPost(
 
       const refreshed = await refreshEasyshipShipment(context.env, shipment.easyshipShipmentId);
       await updateShipmentFromSnapshot(context.env, params.orderId, params.shipmentId, selectedQuoteId, refreshed, null);
+      const trackingEmailResult = await maybeSendTrackingEmail({
+        env: context.env,
+        db: context.env.DB,
+        orderId: params.orderId,
+        shipmentId: params.shipmentId,
+        previousTrackingNumber,
+        newTrackingNumber: refreshed.trackingNumber,
+      });
+      if (!trackingEmailResult.sent) {
+        console.log('[tracking-email] skipped', {
+          orderId: params.orderId,
+          shipmentId: params.shipmentId,
+          reason: trackingEmailResult.skippedReason || 'unknown',
+        });
+      }
       const shipments = await listOrderShipments(context.env.DB, params.orderId);
       const updated = shipments.find((entry) => entry.id === params.shipmentId) || null;
       return jsonResponse({ ok: true, refreshed: true, shipment: updated, shipments });
@@ -439,6 +456,21 @@ export async function onRequestPost(
     });
 
     await updateShipmentFromSnapshot(context.env, params.orderId, params.shipmentId, selectedQuoteId, created, null);
+    const trackingEmailResult = await maybeSendTrackingEmail({
+      env: context.env,
+      db: context.env.DB,
+      orderId: params.orderId,
+      shipmentId: params.shipmentId,
+      previousTrackingNumber,
+      newTrackingNumber: created.trackingNumber,
+    });
+    if (!trackingEmailResult.sent) {
+      console.log('[tracking-email] skipped', {
+        orderId: params.orderId,
+        shipmentId: params.shipmentId,
+        reason: trackingEmailResult.skippedReason || 'unknown',
+      });
+    }
     await context.env.DB.prepare(
       `UPDATE order_shipments
        SET quote_selected_id = ?, updated_at = ?

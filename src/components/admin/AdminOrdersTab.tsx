@@ -106,7 +106,7 @@ export function AdminOrdersTab({
                     <th className="px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Customer</th>
                     <th className="px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Items</th>
                     <th className="px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Total</th>
-                    <th className="px-6 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Shipping</th>
+                    <th className="px-6 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Shipping</th>
                     <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Actions</th>
                   </tr>
                 </thead>
@@ -132,13 +132,13 @@ export function AdminOrdersTab({
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-charcoal">
                         ${(((order.amountTotalCents ?? order.totalCents) || 0) / 100).toFixed(2)}
                       </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <td className="px-6 py-4 text-center align-middle whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => onOpenShipping(order)}
                           className="lux-button--ghost px-3 py-1 text-[10px]"
                         >
-                          Manage
+                          Create Label
                         </button>
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">

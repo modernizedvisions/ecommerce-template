@@ -8,6 +8,7 @@ import {
   orderExists,
   type ShippingLabelsEnv,
 } from '../../../../../_lib/shippingLabels';
+import { maybeSendTrackingEmail } from '../../../../../_lib/maybeSendTrackingEmail';
 
 const getRouteParams = (request: Request): { orderId: string; shipmentId: string } | null => {
   const pathname = new URL(request.url).pathname;
@@ -75,7 +76,7 @@ export async function onRequestGet(
       return jsonResponse({ ok: false, error: 'Shipment not found' }, 404);
     }
 
-    if (!shipment.easyshipShipmentId || shipment.labelUrl) {
+    if (!shipment.easyshipShipmentId || (shipment.labelUrl && shipment.trackingNumber)) {
       const shipments = await listOrderShipments(context.env.DB, params.orderId);
       const current = shipments.find((entry) => entry.id === params.shipmentId) || null;
       return jsonResponse({
@@ -87,8 +88,24 @@ export async function onRequestGet(
       });
     }
 
+    const previousTrackingNumber = shipment.trackingNumber;
     const refreshedSnapshot = await refreshEasyshipShipment(context.env, shipment.easyshipShipmentId);
     await updateShipmentFromSnapshot(context.env, params.orderId, params.shipmentId, refreshedSnapshot);
+    const trackingEmailResult = await maybeSendTrackingEmail({
+      env: context.env,
+      db: context.env.DB,
+      orderId: params.orderId,
+      shipmentId: params.shipmentId,
+      previousTrackingNumber,
+      newTrackingNumber: refreshedSnapshot.trackingNumber,
+    });
+    if (!trackingEmailResult.sent) {
+      console.log('[tracking-email] skipped', {
+        orderId: params.orderId,
+        shipmentId: params.shipmentId,
+        reason: trackingEmailResult.skippedReason || 'unknown',
+      });
+    }
     const shipments = await listOrderShipments(context.env.DB, params.orderId);
     const updated = shipments.find((entry) => entry.id === params.shipmentId) || null;
     return jsonResponse({

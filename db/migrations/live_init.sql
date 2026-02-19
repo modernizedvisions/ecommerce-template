@@ -338,6 +338,7 @@ CREATE TABLE IF NOT EXISTS order_shipments (
   error_message TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   purchased_at TEXT,
+  tracking_email_sent_at TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   FOREIGN KEY (box_preset_id) REFERENCES shipping_box_presets(id) ON DELETE SET NULL,

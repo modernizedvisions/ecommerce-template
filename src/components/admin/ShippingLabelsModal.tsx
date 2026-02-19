@@ -60,6 +60,31 @@ const formatCurrency = (cents: number | null | undefined, currency = 'USD') => {
   }
 };
 
+const getInitials = (value: string) =>
+  value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('') || 'IT';
+
+const resolveLabelStatus = (shipment: OrderShipment): { code: string; message: string; detail?: string | null } => {
+  if (shipment.labelState === 'failed' || shipment.errorMessage) {
+    return { code: 'failed', message: 'FAILED', detail: shipment.errorMessage || null };
+  }
+  if (shipment.trackingNumber) {
+    return { code: 'tracking', message: shipment.trackingNumber };
+  }
+  if (shipment.labelState === 'generated' && shipment.labelUrl) {
+    return { code: 'ready_no_tracking', message: 'Label ready (tracking pending)' };
+  }
+  if (shipment.purchasedAt || shipment.easyshipShipmentId) {
+    return { code: 'pending', message: 'PENDING' };
+  }
+  return { code: 'not_purchased', message: 'LABEL NOT PURCHASED' };
+};
+
 const initialDraftFromShipment = (shipment: OrderShipment): ParcelDraft => ({
   boxPresetId: shipment.boxPresetId || '',
   useCustom:
@@ -88,6 +113,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
   const orderId = order?.id || null;
   const missingShipFrom = useMemo(() => requiredShipFromMissing(shipFrom), [shipFrom]);
   const shipFromReady = missingShipFrom.length === 0;
+  const orderCurrency = order?.currency || 'USD';
 
   const seedDrafts = (nextShipments: OrderShipment[]) => {
     setDrafts((prev) => {
@@ -425,6 +451,48 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                 </div>
               </section>
 
+              <section className="lux-panel p-4">
+                <p className="lux-label text-[10px] mb-2">Items</p>
+                {Array.isArray(order.items) && order.items.length > 0 ? (
+                  <div className="space-y-2">
+                    {order.items.map((item, index) => {
+                      const quantity = Number.isFinite(Number(item.quantity)) && Number(item.quantity) > 0 ? Number(item.quantity) : 1;
+                      const unitPriceCents = Number.isFinite(Number(item.priceCents)) ? Number(item.priceCents) : 0;
+                      const lineTotalCents = unitPriceCents * quantity;
+                      const name = item.productName || item.customOrderDisplayId || item.productId || 'Item';
+                      const imageUrl = item.productImageUrl || item.imageUrl || null;
+                      return (
+                        <div
+                          key={`${item.productId || 'item'}-${index}`}
+                          className="flex items-center gap-3 rounded-shell border border-driftwood/60 bg-white/80 px-3 py-2"
+                        >
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-shell border border-driftwood/60 bg-linen/70">
+                            {imageUrl ? (
+                              <img src={imageUrl} alt={name} className="h-full w-full object-cover" loading="lazy" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-charcoal/60">
+                                {getInitials(name)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-medium text-charcoal">{name}</div>
+                            <div className="text-xs text-charcoal/70">
+                              Qty: {quantity} - {formatCurrency(unitPriceCents, orderCurrency)}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-sm font-semibold text-charcoal">
+                            {formatCurrency(lineTotalCents, orderCurrency)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-sm text-charcoal/60">Items unavailable for this order.</div>
+                )}
+              </section>
+
               <div className="flex items-center justify-between">
                 <p className="lux-label text-[10px]">Parcels</p>
                 <button
@@ -644,8 +712,51 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                         )}
 
                         <div className="mt-3 rounded-shell border border-driftwood/60 bg-white/80 p-3 text-sm">
+                          {(() => {
+                            const labelStatus = resolveLabelStatus(shipment);
+                            const isTracking = labelStatus.code === 'tracking';
+                            const isFailed = labelStatus.code === 'failed';
+                            return (
+                              <>
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="lux-label text-[10px]">Label</p>
+                                  <div
+                                    className={`text-xs ${
+                                      isTracking
+                                        ? 'text-charcoal font-medium'
+                                        : isFailed
+                                        ? 'text-rose-700 font-semibold'
+                                        : labelStatus.code === 'pending'
+                                        ? 'text-amber-800 font-semibold'
+                                        : 'text-charcoal/70'
+                                    }`}
+                                  >
+                                    {isTracking ? (
+                                      <span className="inline-flex items-center gap-2">
+                                        <span>Tracking:</span>
+                                        <span className="font-mono">{labelStatus.message}</span>
+                                        <button
+                                          type="button"
+                                          className="lux-button--ghost px-2 py-1 text-[10px]"
+                                          onClick={() => void handleCopyTracking(shipment.trackingNumber)}
+                                        >
+                                          Copy
+                                        </button>
+                                      </span>
+                                    ) : (
+                                      labelStatus.message
+                                    )}
+                                  </div>
+                                </div>
+                                {isFailed && labelStatus.detail && (
+                                  <div className="mt-2 max-w-[540px] text-xs text-rose-700/90 truncate">
+                                    {labelStatus.detail}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                           <div className="flex flex-wrap items-center justify-between gap-3">
-                            <p className="lux-label text-[10px]">Label</p>
                             <div className="flex flex-wrap items-center justify-end gap-2">
                               {pendingRefresh ? (
                                 <>
@@ -659,7 +770,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                     Refresh
                                   </button>
                                 </>
-                              ) : <span className="text-xs text-charcoal/60">{shipment.labelUrl ? 'Label ready' : 'No label yet'}</span>}
+                              ) : null}
                             </div>
                           </div>
                           {(shipment.labelUrl || shipment.trackingNumber || shipment.labelCostAmountCents !== null) && (
@@ -672,13 +783,6 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                               {shipment.trackingNumber && (
                                 <span className="inline-flex items-center gap-2">
                                   Tracking: {shipment.trackingNumber}
-                                  <button
-                                    type="button"
-                                    className="lux-button--ghost px-2 py-1 text-[10px]"
-                                    onClick={() => void handleCopyTracking(shipment.trackingNumber)}
-                                  >
-                                    Copy
-                                  </button>
                                 </span>
                               )}
                               {shipment.labelCostAmountCents !== null && (
