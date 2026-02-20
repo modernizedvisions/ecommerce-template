@@ -61,12 +61,12 @@ export function AdminEmailListTab() {
 
   return (
     <div className="lux-card p-6 space-y-4">
-      <AdminSectionHeader
-        title="Email List"
-        subtitle="Emails collected from the public /join page."
-      />
-
-      <div className="lux-panel p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <AdminSectionHeader
+          title="Email List"
+          subtitle="Emails collected from the public /join page."
+          className="mb-0 text-left"
+        />
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

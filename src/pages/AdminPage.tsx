@@ -1220,6 +1220,9 @@ export function AdminPage() {
             onSearchChange={setSearchQuery}
             onSelectOrder={handleSelectOrder}
             onOpenShipping={openShippingModal}
+            onRefresh={() => {
+              void loadAdminData();
+            }}
             loading={isLoadingOrders}
             error={ordersError}
           />

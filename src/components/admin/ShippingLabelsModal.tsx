@@ -156,6 +156,11 @@ const formatMeasurement = (value: number | null): string => {
   return Number(value.toFixed(2)).toString();
 };
 
+const numbersMatch = (left: number | null, right: number | null): boolean => {
+  if (left === null || right === null) return left === right;
+  return Math.abs(left - right) < 0.0001;
+};
+
 const initialDraftFromShipment = (shipment: OrderShipment): ParcelDraft => ({
   boxPresetId: shipment.boxPresetId || '',
   useCustom:
@@ -654,6 +659,23 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                       !!shipment.purchasedAt ||
                       !!shipment.easyshipShipmentId ||
                       !!shipment.labelUrl;
+                    const customLengthDraft = toNumberOrNull(draft.customLengthIn);
+                    const customWidthDraft = toNumberOrNull(draft.customWidthIn);
+                    const customHeightDraft = toNumberOrNull(draft.customHeightIn);
+                    const weightDraft = toNumberOrNull(draft.weightLb);
+                    const customDraftSaved =
+                      draft.useCustom &&
+                      customLengthDraft !== null &&
+                      customWidthDraft !== null &&
+                      customHeightDraft !== null &&
+                      weightDraft !== null &&
+                      weightDraft > 0 &&
+                      shipment.boxPresetId === null &&
+                      numbersMatch(customLengthDraft, shipment.customLengthIn) &&
+                      numbersMatch(customWidthDraft, shipment.customWidthIn) &&
+                      numbersMatch(customHeightDraft, shipment.customHeightIn) &&
+                      numbersMatch(weightDraft, shipment.weightLb);
+                    const customNeedsSaveBeforeQuotes = draft.useCustom && !customDraftSaved;
                     const parcelStatus = parcelStatusById[shipment.id] || { state: 'idle' };
                     const parcelStatusMessage =
                       parcelStatus.state === 'loading' ? getLoadingMessage(parcelStatus.action) : parcelStatus.state === 'idle' ? '' : parcelStatus.message;
@@ -767,7 +789,8 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                               <button
                                 type="button"
                                 className="lux-button--ghost px-3 py-2 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={!canBuyLabel || isParcelLoading}
+                                title={customNeedsSaveBeforeQuotes ? 'Save custom dimensions before getting a quote.' : undefined}
+                                disabled={customNeedsSaveBeforeQuotes || !canBuyLabel || isParcelLoading}
                                 onClick={() => void handleGetQuotes(shipment)}
                               >
                                 Get Quotes

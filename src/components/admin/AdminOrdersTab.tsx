@@ -1,4 +1,5 @@
 import React from 'react';
+import { RefreshCcw } from 'lucide-react';
 import { AdminSectionHeader } from './AdminSectionHeader';
 import type { AdminOrder } from '../../lib/db/orders';
 import { formatEasternDateTime } from '../../lib/dates';
@@ -9,6 +10,7 @@ export interface AdminOrdersTabProps {
   onSearchChange: (value: string) => void;
   onSelectOrder: (order: AdminOrder) => void;
   onOpenShipping: (order: AdminOrder) => void;
+  onRefresh: () => void;
   loading?: boolean;
   error?: string | null;
 }
@@ -19,6 +21,7 @@ export function AdminOrdersTab({
   onSearchChange,
   onSelectOrder,
   onOpenShipping,
+  onRefresh,
   loading,
   error,
 }: AdminOrdersTabProps) {
@@ -36,6 +39,24 @@ export function AdminOrdersTab({
           placeholder="Search by order ID, customer, or product..."
           className="lux-input sm:max-w-md text-sm"
         />
+        <button
+          type="button"
+          className="lux-button--ghost px-3 py-2 text-[10px] disabled:opacity-60"
+          disabled={!!loading}
+          onClick={onRefresh}
+        >
+          {loading ? (
+            <span className="inline-flex items-center gap-2">
+              <RefreshCcw className="h-3.5 w-3.5 animate-spin" />
+              Refreshing...
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-2">
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Refresh
+            </span>
+          )}
+        </button>
       </div>
       {loading ? (
         <div className="p-8 text-center text-charcoal/70">Loading orders...</div>
