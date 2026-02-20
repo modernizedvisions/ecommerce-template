@@ -979,7 +979,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <p className="lux-label text-[10px]">Carrier:</p>
-                                  <div className="text-[11px] text-charcoal/60">{carrierDisplayText}</div>
+                                  <div className="text-xs text-charcoal/60">{carrierDisplayText}</div>
                                 </div>
                               </div>
                             );

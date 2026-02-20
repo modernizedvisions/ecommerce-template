@@ -61,13 +61,13 @@ export function AdminEmailListTab() {
 
   return (
     <div className="lux-card p-6 space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="relative">
         <AdminSectionHeader
           title="Email List"
           subtitle="Emails collected from the public /join page."
-          className="mb-0 text-left"
+          className="mb-0"
         />
-        <div className="flex flex-wrap gap-2">
+        <div className="absolute right-0 top-0 flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             className="lux-button--ghost px-3 py-2 text-[10px] disabled:opacity-60"
