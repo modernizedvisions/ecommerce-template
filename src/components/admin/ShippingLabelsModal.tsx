@@ -137,19 +137,6 @@ const getLoadingMessage = (action: ParcelUiAction): string => {
   return 'Refreshing Label...';
 };
 
-const resolveTrackingDisplayText = (shipment: OrderShipment): string => {
-  const tracking = trimText(shipment.trackingNumber);
-  if (tracking) return tracking;
-
-  const hasPurchasedOrGenerated =
-    shipment.labelState === 'generated' ||
-    !!trimText(shipment.purchasedAt) ||
-    !!trimText(shipment.labelUrl) ||
-    !!trimText(shipment.easyshipShipmentId);
-
-  return hasPurchasedOrGenerated ? 'Pending' : 'Label Not Yet Created';
-};
-
 const toDisplayMeasurement = (value: number | string | null | undefined): number | null => {
   if (typeof value === 'number') {
     return Number.isFinite(value) && value > 0 ? value : null;
@@ -173,9 +160,10 @@ const initialDraftFromShipment = (shipment: OrderShipment): ParcelDraft => ({
   boxPresetId: shipment.boxPresetId || '',
   useCustom:
     shipment.customLengthIn !== null || shipment.customWidthIn !== null || shipment.customHeightIn !== null,
-  customLengthIn: shipment.customLengthIn === null ? '' : String(shipment.customLengthIn),
-  customWidthIn: shipment.customWidthIn === null ? '' : String(shipment.customWidthIn),
-  customHeightIn: shipment.customHeightIn === null ? '' : String(shipment.customHeightIn),
+  // Keep custom inputs session-local; do not prefill from effective/preset-derived values.
+  customLengthIn: '',
+  customWidthIn: '',
+  customHeightIn: '',
   weightLb: String(shipment.weightLb ?? ''),
 });
 
@@ -307,6 +295,33 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
         ...patch,
       },
     }));
+  };
+
+  const toggleCustomDimensions = (shipmentId: string, enabled: boolean) => {
+    setDrafts((prev) => {
+      const existing = prev[shipmentId] || {
+        boxPresetId: '',
+        useCustom: false,
+        customLengthIn: '',
+        customWidthIn: '',
+        customHeightIn: '',
+        weightLb: '',
+      };
+      const next = { ...existing, useCustom: enabled };
+      if (enabled) {
+        // If no session-entered custom values exist, initialize as blank (never pull preset/effective dims).
+        if (
+          !next.customLengthIn.trim() &&
+          !next.customWidthIn.trim() &&
+          !next.customHeightIn.trim()
+        ) {
+          next.customLengthIn = '';
+          next.customWidthIn = '';
+          next.customHeightIn = '';
+        }
+      }
+      return { ...prev, [shipmentId]: next };
+    });
   };
 
   const persistShipmentDraft = async (shipmentId: string): Promise<void> => {
@@ -559,40 +574,6 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
           ) : (
             <>
               <section className="lux-panel p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="lux-label text-[10px] mb-1">Ship From</p>
-                    {shipFromReady && shipFrom ? (
-                      <div className="text-sm text-charcoal/80 whitespace-pre-line">
-                        {shipFrom.shipFromName}
-                        {'\n'}
-                        {shipFrom.shipFromAddress1}
-                        {shipFrom.shipFromAddress2 ? `\n${shipFrom.shipFromAddress2}` : ''}
-                        {'\n'}
-                        {shipFrom.shipFromCity}, {shipFrom.shipFromState} {shipFrom.shipFromPostal}
-                        {'\n'}
-                        {shipFrom.shipFromCountry}
-                        {shipFrom.shipFromPhone ? `\n${shipFrom.shipFromPhone}` : ''}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-rose-700">
-                        Ship-from settings are incomplete. Missing: {missingShipFrom.join(', ')}
-                      </div>
-                    )}
-                  </div>
-                  {!shipFromReady && (
-                    <button
-                      type="button"
-                      className="lux-button--ghost px-3 py-1 text-[10px]"
-                      onClick={onOpenSettings}
-                    >
-                      Open Settings
-                    </button>
-                  )}
-                </div>
-              </section>
-
-              <section className="lux-panel p-4">
                 <p className="lux-label text-[10px] mb-2">Items</p>
                 {Array.isArray(order.items) && order.items.length > 0 ? (
                   <div className="space-y-2">
@@ -685,36 +666,27 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                       ? 'Custom Box'
                       : trimText(selectedPreset?.name) || trimText(shipment.boxPresetName) || 'Box Not Selected';
                     const displayLength = draft.useCustom
-                      ? toDisplayMeasurement(draft.customLengthIn) ??
-                        toDisplayMeasurement(shipment.customLengthIn) ??
-                        toDisplayMeasurement(shipment.effectiveLengthIn)
+                      ? toDisplayMeasurement(draft.customLengthIn)
                       : selectedPreset
                       ? toDisplayMeasurement(selectedPreset.lengthIn)
                       : toDisplayMeasurement(shipment.effectiveLengthIn) ??
                         toDisplayMeasurement(shipment.customLengthIn);
                     const displayWidth = draft.useCustom
-                      ? toDisplayMeasurement(draft.customWidthIn) ??
-                        toDisplayMeasurement(shipment.customWidthIn) ??
-                        toDisplayMeasurement(shipment.effectiveWidthIn)
+                      ? toDisplayMeasurement(draft.customWidthIn)
                       : selectedPreset
                       ? toDisplayMeasurement(selectedPreset.widthIn)
                       : toDisplayMeasurement(shipment.effectiveWidthIn) ??
                         toDisplayMeasurement(shipment.customWidthIn);
                     const displayHeight = draft.useCustom
-                      ? toDisplayMeasurement(draft.customHeightIn) ??
-                        toDisplayMeasurement(shipment.customHeightIn) ??
-                        toDisplayMeasurement(shipment.effectiveHeightIn)
+                      ? toDisplayMeasurement(draft.customHeightIn)
                       : selectedPreset
                       ? toDisplayMeasurement(selectedPreset.heightIn)
                       : toDisplayMeasurement(shipment.effectiveHeightIn) ??
                         toDisplayMeasurement(shipment.customHeightIn);
                     const displayWeight = toDisplayMeasurement(draft.weightLb) ?? toDisplayMeasurement(shipment.weightLb);
                     const parcelSummaryLine = `${formatMeasurement(displayLength)} \u00d7 ${formatMeasurement(displayWidth)} \u00d7 ${formatMeasurement(displayHeight)} in \u2022 ${formatMeasurement(displayWeight)} lb`;
-                    const trackingServiceText = (() => {
+                    const carrierDisplayText = (() => {
                       const carrier = trimText(shipment.carrier);
-                      const service = trimText(shipment.service);
-                      if (carrier && service) return `${carrier} \u2014 ${service}`;
-                      if (service) return service;
                       if (carrier) return carrier;
                       return 'Carrier Not Selected';
                     })();
@@ -804,7 +776,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                         </div>
 
                         <div className="mt-3 rounded-shell border border-driftwood/60 bg-white/80 p-3">
-                          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-charcoal">{boxLabel}</p>
+                          <p className="lux-heading !text-sm sm:!text-sm !leading-tight !text-charcoal uppercase tracking-[0.12em]">{boxLabel}</p>
                           <p className="mt-1 text-xs text-charcoal/70">{parcelSummaryLine}</p>
                         </div>
 
@@ -832,7 +804,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                 <input
                                   type="checkbox"
                                   checked={draft.useCustom}
-                                  onChange={(e) => updateDraft(shipment.id, { useCustom: e.target.checked })}
+                                  onChange={(e) => toggleCustomDimensions(shipment.id, e.target.checked)}
                                 />
                                 Use Custom Dimensions
                               </label>
@@ -949,13 +921,11 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                         <div className="mt-3 rounded-shell border border-driftwood/60 bg-white/80 p-3 text-sm">
                           {(() => {
                             const trackingValue = trimText(shipment.trackingNumber);
-                            const displayText = resolveTrackingDisplayText(shipment);
+                            const displayText = trackingValue || 'Pending';
                             return (
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="lux-label text-[10px]">TRACKING:</p>
-                                <div
-                                  className="text-right"
-                                >
+                              <div className="space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                  <p className="lux-label text-[10px]">TRACKING:</p>
                                   <div
                                     className={`text-xs ${
                                       trackingValue ? 'font-mono text-charcoal font-medium' : 'text-charcoal/70'
@@ -963,9 +933,10 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                   >
                                     {displayText}
                                   </div>
-                                  {trackingServiceText && (
-                                    <div className="mt-0.5 text-[11px] text-charcoal/60">{trackingServiceText}</div>
-                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <p className="lux-label text-[10px]">Carrier:</p>
+                                  <div className="text-[11px] text-charcoal/60">{carrierDisplayText}</div>
                                 </div>
                               </div>
                             );
