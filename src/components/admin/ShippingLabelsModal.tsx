@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 import type { AdminOrder } from '../../lib/db/orders';
 import {
   adminBuyShipmentLabel,
@@ -646,8 +646,12 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                       !!shipment.purchasedAt ||
                       !!shipment.labelUrl;
                     const canRemove = !shipment.purchasedAt && shipment.labelState !== 'generated';
-                    const pendingRefresh = shipment.labelState === 'pending' && !!shipment.easyshipShipmentId;
                     const canBuyLabel = !shipment.purchasedAt && shipment.labelState !== 'generated';
+                    const canRefreshLabel =
+                      shipment.labelState === 'pending' ||
+                      shipment.labelState === 'generated' ||
+                      !!shipment.purchasedAt ||
+                      !!shipment.easyshipShipmentId;
                     const parcelStatus = parcelStatusById[shipment.id] || { state: 'idle' };
                     const parcelStatusMessage =
                       parcelStatus.state === 'loading' ? getLoadingMessage(parcelStatus.action) : parcelStatus.state === 'idle' ? '' : parcelStatus.message;
@@ -656,6 +660,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                         ? [parcelStatus.message, parcelStatus.subtext].filter(Boolean).join(' ')
                         : parcelStatusMessage;
                     const isParcelLoading = parcelStatus.state === 'loading';
+                    const isRefreshing = parcelStatus.state === 'loading' && parcelStatus.action === 'refresh';
                     const selectedPresetId = draft.useCustom
                       ? null
                       : trimText(draft.boxPresetId) || trimText(shipment.boxPresetId);
@@ -743,6 +748,16 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                 Download Label (PDF)
                               </button>
                             )}
+                            {canRefreshLabel && (
+                              <button
+                                type="button"
+                                className="lux-button--ghost px-3 py-2 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={isParcelLoading}
+                                onClick={() => void handleRefreshLabel(shipment)}
+                              >
+                                {isRefreshing ? 'REFRESHING...' : 'REFRESH'}
+                              </button>
+                            )}
                             {!isComplete && (
                               <button
                                 type="button"
@@ -776,7 +791,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                         </div>
 
                         <div className="mt-3 rounded-shell border border-driftwood/60 bg-white/80 p-3">
-                          <p className="lux-heading !text-sm sm:!text-sm !leading-tight !text-charcoal uppercase tracking-[0.12em]">{boxLabel}</p>
+                          <p className="lux-label text-[10px] text-charcoal/80">{boxLabel}</p>
                           <p className="mt-1 text-xs text-charcoal/70">{parcelSummaryLine}</p>
                         </div>
 
@@ -941,26 +956,6 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                               </div>
                             );
                           })()}
-                          {!isComplete && (
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex flex-wrap items-center justify-end gap-2">
-                                {pendingRefresh ? (
-                                  <>
-                                    <span className="text-xs text-amber-800">Generating...</span>
-                                    <button
-                                      type="button"
-                                      className="lux-button--ghost px-3 py-1 text-[10px] disabled:opacity-50"
-                                      disabled={isParcelLoading}
-                                      onClick={() => void handleRefreshLabel(shipment)}
-                                    >
-                                      <RefreshCcw className="h-4 w-4" />
-                                      Refresh
-                                    </button>
-                                  </>
-                                ) : null}
-                              </div>
-                            </div>
-                          )}
                           {shipment.labelCostAmountCents !== null && (
                             <div className="mt-2 flex flex-wrap items-center gap-3 text-emerald-800">
                               <span>Cost: {formatCurrency(shipment.labelCostAmountCents, shipment.labelCurrency)}</span>
