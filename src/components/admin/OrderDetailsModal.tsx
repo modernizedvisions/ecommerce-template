@@ -22,6 +22,21 @@ const formatCurrency = (cents: number | null | undefined, currency: string = 'us
   }
 };
 
+const resolveTrackingDisplay = (shipment: OrderShipment): string => {
+  const tracking = typeof shipment.trackingNumber === 'string' ? shipment.trackingNumber.trim() : '';
+  if (tracking) return tracking;
+
+  const labelState = (shipment.labelState || '').toLowerCase();
+  const hasPurchasedOrGenerated =
+    labelState === 'generated' ||
+    labelState === 'pending' ||
+    !!shipment.labelUrl ||
+    !!shipment.purchasedAt ||
+    !!shipment.easyshipShipmentId;
+
+  return hasPurchasedOrGenerated ? 'Pending' : 'Label Not Purchased';
+};
+
 export function OrderDetailsModal({ open, order, onClose, onOpenShippingLabels }: OrderDetailsModalProps) {
   if (!open || !order) return null;
 
@@ -315,47 +330,54 @@ export function OrderDetailsModal({ open, order, onClose, onOpenShippingLabels }
                 <div className="text-sm text-charcoal/60">No labels yet.</div>
               ) : (
                 <div className="space-y-3">
-                  {shipments.map((shipment) => (
-                    <div key={shipment.id} className="rounded-shell border border-driftwood/60 bg-white/80 p-3 text-sm">
-                      <div className="font-medium text-charcoal">
-                        Parcel #{shipment.parcelIndex} {shipment.carrier ? `- ${shipment.carrier}` : ''}{' '}
-                        {shipment.service ? shipment.service : ''}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-3 text-charcoal/70">
-                        <span className="inline-flex items-center gap-2">
-                          Tracking: {shipment.trackingNumber || '-'}
-                          {shipment.trackingNumber && (
-                            <button
-                              type="button"
+                  {shipments.map((shipment) => {
+                    const trackingNumber =
+                      typeof shipment.trackingNumber === 'string' ? shipment.trackingNumber.trim() : '';
+                    const trackingDisplay = resolveTrackingDisplay(shipment);
+                    return (
+                      <div key={shipment.id} className="rounded-shell border border-driftwood/60 bg-white/80 p-3 text-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="font-medium text-charcoal">
+                            Parcel #{shipment.parcelIndex} {shipment.carrier ? `- ${shipment.carrier}` : ''}{' '}
+                            {shipment.service ? shipment.service : ''}
+                          </div>
+                          {shipment.labelUrl && (
+                            <a
+                              href={shipment.labelUrl}
+                              target="_blank"
+                              rel="noreferrer"
                               className="lux-button--ghost px-2 py-1 text-[10px]"
-                              onClick={() => void navigator.clipboard?.writeText(shipment.trackingNumber || '')}
                             >
-                              Copy
-                            </button>
+                              Download PDF
+                            </a>
                           )}
-                        </span>
-                        {shipment.labelCostAmountCents !== null && (
-                          <span>
-                            Cost:{' '}
-                            {formatCurrency(
-                              shipment.labelCostAmountCents,
-                              shipment.labelCurrency || order.currency || 'USD'
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-charcoal/70">
+                          <span className="inline-flex items-center gap-2">
+                            Tracking: {trackingDisplay}
+                            {trackingNumber && (
+                              <button
+                                type="button"
+                                className="lux-button--ghost px-2 py-1 text-[10px]"
+                                onClick={() => void navigator.clipboard?.writeText(trackingNumber)}
+                              >
+                                Copy
+                              </button>
                             )}
                           </span>
-                        )}
-                        {shipment.labelUrl && (
-                          <a
-                            href={shipment.labelUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="lux-button--ghost px-2 py-1 text-[10px]"
-                          >
-                            Download PDF
-                          </a>
-                        )}
+                          {shipment.labelCostAmountCents !== null && (
+                            <span>
+                              Cost:{' '}
+                              {formatCurrency(
+                                shipment.labelCostAmountCents,
+                                shipment.labelCurrency || order.currency || 'USD'
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>
