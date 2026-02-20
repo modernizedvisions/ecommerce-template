@@ -818,11 +818,6 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                           </div>
                         </div>
 
-                        <div className="mt-3 rounded-shell border border-driftwood/60 bg-white/80 p-3">
-                          <p className="lux-label text-[10px] text-charcoal/80">{boxLabel}</p>
-                          <p className="mt-1 text-xs text-charcoal/70">{parcelSummaryLine}</p>
-                        </div>
-
                         {!isComplete && (
                           <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                             <div className="w-full max-w-[520px] space-y-3">
@@ -907,6 +902,11 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                             </div>
                           </div>
                         )}
+
+                        <div className="mt-3 rounded-shell border border-driftwood/60 bg-white/80 p-3">
+                          <p className="lux-label text-[10px] text-charcoal/80">{boxLabel}</p>
+                          <p className="mt-1 text-xs text-charcoal/70">{parcelSummaryLine}</p>
+                        </div>
 
                         {!isComplete && (
                           <>
