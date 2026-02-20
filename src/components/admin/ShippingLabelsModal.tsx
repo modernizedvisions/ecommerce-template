@@ -26,6 +26,14 @@ type ParcelDraft = {
   weightLb: string;
 };
 
+type ParcelUiAction = 'quotes' | 'buy' | 'refresh';
+
+type ParcelUiStatus =
+  | { state: 'idle' }
+  | { state: 'loading'; action: ParcelUiAction }
+  | { state: 'success'; action: ParcelUiAction; message: string }
+  | { state: 'error'; action: ParcelUiAction; message: string; subtext?: string };
+
 interface ShippingLabelsModalProps {
   open: boolean;
   order: AdminOrder | null;
@@ -75,6 +83,37 @@ const getInitials = (value: string) =>
     .map((part) => part[0]?.toUpperCase() || '')
     .join('') || 'IT';
 
+const PURCHASED_LABEL_TOOLTIP = 'Label already purchased for this parcel. Add a new parcel to buy another.';
+const NO_QUOTES_PRIMARY = 'No quotes found for this package. Try a different box size or weight.';
+const NO_QUOTES_SUBTEXT = 'If it still fails, try pricing it in Easyship directly.';
+
+const isNoQuotesFailure = (message: string): boolean => {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('no_quotes') ||
+    normalized.includes('no_rates') ||
+    normalized.includes('no supported carrier quotes') ||
+    normalized.includes('no shipping solutions') ||
+    normalized.includes('no rate available for label purchase')
+  );
+};
+
+const normalizeParcelActionError = (message: string): { message: string; subtext?: string } => {
+  if (isNoQuotesFailure(message)) {
+    return {
+      message: NO_QUOTES_PRIMARY,
+      subtext: NO_QUOTES_SUBTEXT,
+    };
+  }
+  return { message };
+};
+
+const getLoadingMessage = (action: ParcelUiAction): string => {
+  if (action === 'quotes') return 'Fetching quotes...';
+  if (action === 'buy') return 'Buying label...';
+  return 'Refreshing label...';
+};
+
 const resolveTrackingDisplayText = (shipment: OrderShipment): string => {
   const tracking = trimText(shipment.trackingNumber);
   if (tracking) return tracking;
@@ -114,16 +153,28 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
   const [quoteWarningByShipment, setQuoteWarningByShipment] = useState<Record<string, string>>({});
   const [quoteDebugByShipment, setQuoteDebugByShipment] = useState<Record<string, ShipmentQuoteDebugHints | null>>({});
   const [selectedQuoteByShipment, setSelectedQuoteByShipment] = useState<Record<string, string | null>>({});
+  const [parcelStatusById, setParcelStatusById] = useState<Record<string, ParcelUiStatus>>({});
   const [busyByShipment, setBusyByShipment] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
 
   const orderId = order?.id || null;
   const missingShipFrom = useMemo(() => requiredShipFromMissing(shipFrom), [shipFrom]);
   const shipFromReady = missingShipFrom.length === 0;
   const orderCurrency = order?.currency || 'USD';
+
+  const setLoading = (parcelId: string, action: ParcelUiAction) => {
+    setParcelStatusById((prev) => ({ ...prev, [parcelId]: { state: 'loading', action } }));
+  };
+
+  const setSuccess = (parcelId: string, action: ParcelUiAction, message: string) => {
+    setParcelStatusById((prev) => ({ ...prev, [parcelId]: { state: 'success', action, message } }));
+  };
+
+  const setParcelError = (parcelId: string, action: ParcelUiAction, message: string, subtext?: string) => {
+    setParcelStatusById((prev) => ({ ...prev, [parcelId]: { state: 'error', action, message, subtext } }));
+  };
 
   const seedDrafts = (nextShipments: OrderShipment[]) => {
     setDrafts((prev) => {
@@ -171,10 +222,26 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
     void loadModalData();
   }, [open, orderId]);
 
+  useEffect(() => {
+    setParcelStatusById((prev) => {
+      const next: Record<string, ParcelUiStatus> = {};
+      shipments.forEach((shipment) => {
+        next[shipment.id] = prev[shipment.id] || { state: 'idle' };
+      });
+      return next;
+    });
+  }, [shipments]);
+
+  useEffect(() => {
+    if (open) return;
+    setParcelStatusById({});
+    setBusyByShipment({});
+    setError('');
+  }, [open]);
+
   const withShipmentBusy = async (shipmentId: string, label: string, task: () => Promise<void>) => {
     setBusyByShipment((prev) => ({ ...prev, [shipmentId]: label }));
     setError('');
-    setSuccess('');
     try {
       await task();
     } catch (taskError) {
@@ -260,7 +327,6 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
     if (!orderId) return;
     setIsAdding(true);
     setError('');
-    setSuccess('');
     try {
       const firstPreset = boxPresets[0];
       const created = await adminCreateOrderShipment(orderId, firstPreset
@@ -313,12 +379,23 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
         delete next[shipment.id];
         return next;
       });
+      setParcelStatusById((prev) => {
+        const next = { ...prev };
+        delete next[shipment.id];
+        return next;
+      });
     });
   };
 
   const handleGetQuotes = async (shipment: OrderShipment) => {
     if (!orderId) return;
-    await withShipmentBusy(shipment.id, 'Quoting', async () => {
+    setLoading(shipment.id, 'quotes');
+    setQuoteWarningByShipment((prev) => {
+      const next = { ...prev };
+      delete next[shipment.id];
+      return next;
+    });
+    try {
       await persistShipmentDraft(shipment.id);
       const quoted = await adminFetchShipmentQuotes(orderId, shipment.id);
       setShipments(quoted.shipments);
@@ -332,23 +409,32 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
         ...prev,
         [shipment.id]: quoted.rawResponseHints,
       }));
-      if (quoted.warning) {
-        setQuoteWarningByShipment((prev) => ({ ...prev, [shipment.id]: quoted.warning }));
-        setSuccess('No rates available for this parcel.');
+      if (quoted.warning || quoted.rates.length === 0) {
+        const normalized = normalizeParcelActionError(quoted.warning || 'NO_QUOTES');
+        setQuoteWarningByShipment((prev) => ({ ...prev, [shipment.id]: normalized.message }));
+        setParcelError(shipment.id, 'quotes', normalized.message, normalized.subtext);
       } else {
         setQuoteWarningByShipment((prev) => {
           const next = { ...prev };
           delete next[shipment.id];
           return next;
         });
-        setSuccess(quoted.cached ? 'Loaded cached quotes.' : 'Quotes fetched.');
+        setSuccess(shipment.id, 'quotes', 'Quotes fetched.');
       }
-    });
+    } catch (quoteError) {
+      const rawMessage = quoteError instanceof Error ? quoteError.message : 'Failed to fetch quotes.';
+      const normalized = normalizeParcelActionError(rawMessage);
+      if (normalized.subtext) {
+        setQuoteWarningByShipment((prev) => ({ ...prev, [shipment.id]: normalized.message }));
+      }
+      setParcelError(shipment.id, 'quotes', normalized.message, normalized.subtext);
+    }
   };
 
   const handleBuyLabel = async (shipment: OrderShipment) => {
     if (!orderId) return;
-    await withShipmentBusy(shipment.id, 'Buying', async () => {
+    setLoading(shipment.id, 'buy');
+    try {
       if (quoteWarningByShipment[shipment.id]) {
         throw new Error(quoteWarningByShipment[shipment.id]);
       }
@@ -362,28 +448,34 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
       if (bought.selectedQuoteId) {
         setSelectedQuoteByShipment((prev) => ({ ...prev, [shipment.id]: bought.selectedQuoteId }));
       }
-      setSuccess(
-        bought.pendingRefresh
-          ? 'Label is pending. Use Refresh to check status.'
-          : 'Label purchased successfully.'
-      );
-    });
+      setSuccess(shipment.id, 'buy', bought.pendingRefresh ? 'Label purchase submitted. Refresh shortly.' : 'Label purchased.');
+    } catch (buyError) {
+      const rawMessage = buyError instanceof Error ? buyError.message : 'Failed to buy shipment label.';
+      const normalized = normalizeParcelActionError(rawMessage);
+      setParcelError(shipment.id, 'buy', normalized.message, normalized.subtext);
+    }
   };
 
   const handleRefreshLabel = async (shipment: OrderShipment) => {
     if (!orderId) return;
-    await withShipmentBusy(shipment.id, 'refreshing', async () => {
+    setLoading(shipment.id, 'refresh');
+    try {
       const refreshed = await adminFetchShipmentLabelStatus(orderId, shipment.id);
       setShipments(refreshed.shipments);
       seedDrafts(refreshed.shipments);
       setSuccess(
+        shipment.id,
+        'refresh',
         refreshed.pendingRefresh
           ? 'Label still generating. Try refresh again shortly.'
           : refreshed.refreshed
           ? 'Label status refreshed.'
           : 'Label status is up to date.'
       );
-    });
+    } catch (refreshError) {
+      const message = refreshError instanceof Error ? refreshError.message : 'Failed to refresh shipment label status.';
+      setParcelError(shipment.id, 'refresh', message);
+    }
   };
 
   if (!open || !order) return null;
@@ -408,7 +500,6 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
           </div>
 
           {error && <div className="rounded-shell bg-rose-100 px-3 py-2 text-sm text-rose-700">{error}</div>}
-          {success && <div className="rounded-shell bg-emerald-100 px-3 py-2 text-sm text-emerald-700">{success}</div>}
 
           {isLoading ? (
             <div className="flex items-center gap-2 text-charcoal/70">
@@ -522,10 +613,41 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                     const canRemove = !shipment.purchasedAt && shipment.labelState !== 'generated';
                     const pendingRefresh = shipment.labelState === 'pending' && !!shipment.easyshipShipmentId;
                     const canBuyLabel = !shipment.purchasedAt && shipment.labelState !== 'generated';
+                    const parcelStatus = parcelStatusById[shipment.id] || { state: 'idle' };
+                    const parcelStatusMessage =
+                      parcelStatus.state === 'loading' ? getLoadingMessage(parcelStatus.action) : parcelStatus.state === 'idle' ? '' : parcelStatus.message;
+                    const parcelStatusTitle =
+                      parcelStatus.state === 'error'
+                        ? [parcelStatus.message, parcelStatus.subtext].filter(Boolean).join(' ')
+                        : parcelStatusMessage;
+                    const isParcelLoading = parcelStatus.state === 'loading';
+                    const purchasedLabelTooltip = canBuyLabel ? undefined : PURCHASED_LABEL_TOOLTIP;
                     return (
                       <div key={shipment.id} className="lux-panel p-4">
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <h4 className="font-semibold text-charcoal">Parcel #{shipment.parcelIndex}</h4>
+                        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex flex-wrap items-center gap-2">
+                            <h4 className="font-semibold text-charcoal">Parcel #{shipment.parcelIndex}</h4>
+                            {parcelStatus.state !== 'idle' && (
+                              <div
+                                title={parcelStatusTitle}
+                                className={`max-w-[360px] rounded-shell border px-2 py-1 text-[11px] leading-snug ${
+                                  parcelStatus.state === 'loading'
+                                    ? 'border-amber-300 bg-amber-50 text-amber-900'
+                                    : parcelStatus.state === 'success'
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                                    : 'border-rose-300 bg-rose-50 text-rose-800'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1">
+                                  {parcelStatus.state === 'loading' && <Loader2 className="h-3 w-3 animate-spin shrink-0" />}
+                                  <span className="break-words">{parcelStatusMessage}</span>
+                                </div>
+                                {parcelStatus.state === 'error' && parcelStatus.subtext && (
+                                  <div className="mt-0.5 text-[10px] text-rose-700/90 break-words">{parcelStatus.subtext}</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <div className="flex flex-wrap items-center justify-end gap-2">
                             {busyLabel && (
                               <span className="inline-flex items-center gap-1 text-xs text-charcoal/70">
@@ -552,21 +674,26 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                 Download Label (PDF)
                               </button>
                             )}
-                            <button
-                              type="button"
-                              className="lux-button--ghost px-3 py-2 text-[10px]"
-                              onClick={() => void handleGetQuotes(shipment)}
-                            >
-                              Get Quotes
-                            </button>
-                            <button
-                              type="button"
-                              className="lux-button px-3 py-2 text-[10px]"
-                              disabled={!shipFromReady || !!quoteWarning || !canBuyLabel}
-                              onClick={() => void handleBuyLabel(shipment)}
-                            >
-                              Buy Label
-                            </button>
+                            <span title={purchasedLabelTooltip} className="inline-flex">
+                              <button
+                                type="button"
+                                className="lux-button--ghost px-3 py-2 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!canBuyLabel || isParcelLoading}
+                                onClick={() => void handleGetQuotes(shipment)}
+                              >
+                                Get Quotes
+                              </button>
+                            </span>
+                            <span title={purchasedLabelTooltip} className="inline-flex">
+                              <button
+                                type="button"
+                                className="lux-button px-3 py-2 text-[10px]"
+                                disabled={!shipFromReady || !!quoteWarning || !canBuyLabel || isParcelLoading}
+                                onClick={() => void handleBuyLabel(shipment)}
+                              >
+                                Buy Label
+                              </button>
+                            </span>
                             {canRemove && (
                               <button
                                 type="button"
@@ -735,7 +862,8 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                   <span className="text-xs text-amber-800">Generating...</span>
                                   <button
                                     type="button"
-                                    className="lux-button--ghost px-3 py-1 text-[10px]"
+                                    className="lux-button--ghost px-3 py-1 text-[10px] disabled:opacity-50"
+                                    disabled={isParcelLoading}
                                     onClick={() => void handleRefreshLabel(shipment)}
                                   >
                                     <RefreshCcw className="h-4 w-4" />

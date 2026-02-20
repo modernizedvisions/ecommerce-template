@@ -173,11 +173,11 @@ const ADMIN_TABS: Array<{ key: AdminTabKey; label: string; badge?: number }> = [
   { key: 'orders', label: 'Orders', badge: 0 },
   { key: 'shop', label: 'Shop' },
   { key: 'messages', label: 'Messages', badge: 0 },
-  { key: 'promotions', label: 'Promotions' },
   { key: 'customOrders', label: 'Custom Orders' },
-  { key: 'images', label: 'Images' },
-  { key: 'settings', label: 'Settings' },
+  { key: 'promotions', label: 'Promotions' },
   { key: 'emailList', label: 'Email List' },
+  { key: 'images', label: 'Images' },
+  { key: 'settings', label: 'SHIPPING SETTINGS' },
   { key: 'sold', label: 'Sold Products' },
 ];
 
