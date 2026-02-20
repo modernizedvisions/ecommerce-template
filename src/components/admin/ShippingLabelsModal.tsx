@@ -676,7 +676,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                         return `${selectedQuote.carrier} \u2014 ${selectedQuote.service}`;
                       }
                       if (selectedQuote?.service) return selectedQuote.service;
-                      return postBuyState ? 'Purchased' : 'Service selected';
+                      return 'Not selected yet';
                     })();
                     const downloadDisabledTitle = labelPurchased
                       ? 'Label Purchased. Refresh to Download.'

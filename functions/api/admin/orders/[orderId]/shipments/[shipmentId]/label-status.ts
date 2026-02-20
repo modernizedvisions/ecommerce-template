@@ -30,8 +30,8 @@ const updateShipmentFromSnapshot = async (
     `UPDATE order_shipments
      SET easyship_shipment_id = ?,
          easyship_label_id = ?,
-         carrier = ?,
-         service = ?,
+         carrier = COALESCE(?, carrier),
+         service = COALESCE(?, service),
          tracking_number = ?,
          label_url = ?,
          label_cost_amount_cents = ?,

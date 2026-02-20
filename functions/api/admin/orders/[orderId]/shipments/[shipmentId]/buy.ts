@@ -158,9 +158,12 @@ const updateShipmentFromSnapshot = async (
   shipmentId: string,
   quoteSelectedId: string | null,
   snapshot: EasyshipShipmentSnapshot,
-  errorMessage: string | null
+  errorMessage: string | null,
+  selectedRate?: { carrier: string; service: string } | null
 ) => {
   const now = new Date().toISOString();
+  const carrierToStore = trimOrNull(snapshot.carrier) ?? trimOrNull(selectedRate?.carrier) ?? null;
+  const serviceToStore = trimOrNull(snapshot.service) ?? trimOrNull(selectedRate?.service) ?? null;
   await env.DB.prepare(
     `UPDATE order_shipments
      SET easyship_shipment_id = ?,
@@ -181,8 +184,8 @@ const updateShipmentFromSnapshot = async (
     .bind(
       snapshot.shipmentId || null,
       snapshot.labelId,
-      snapshot.carrier,
-      snapshot.service,
+      carrierToStore,
+      serviceToStore,
       snapshot.trackingNumber,
       snapshot.labelUrl,
       snapshot.labelCostAmountCents,
@@ -257,7 +260,15 @@ export async function onRequestPost(
       }
 
       const refreshed = await refreshEasyshipShipment(context.env, shipment.easyshipShipmentId);
-      await updateShipmentFromSnapshot(context.env, params.orderId, params.shipmentId, selectedQuoteId, refreshed, null);
+      await updateShipmentFromSnapshot(
+        context.env,
+        params.orderId,
+        params.shipmentId,
+        selectedQuoteId,
+        refreshed,
+        null,
+        null
+      );
       const trackingEmailResult = await maybeSendTrackingEmail({
         env: context.env,
         db: context.env.DB,
@@ -455,7 +466,15 @@ export async function onRequestPost(
       externalReference: `${params.orderId}:${params.shipmentId}`,
     });
 
-    await updateShipmentFromSnapshot(context.env, params.orderId, params.shipmentId, selectedQuoteId, created, null);
+    await updateShipmentFromSnapshot(
+      context.env,
+      params.orderId,
+      params.shipmentId,
+      selectedQuoteId,
+      created,
+      null,
+      { carrier: selectedRate.carrier, service: selectedRate.service }
+    );
     const trackingEmailResult = await maybeSendTrackingEmail({
       env: context.env,
       db: context.env.DB,
