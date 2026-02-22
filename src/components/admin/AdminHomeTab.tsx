@@ -239,8 +239,8 @@ function HeroCollageAdmin({
             <span>{heroRotationEnabled ? 'ON' : 'OFF'}</span>
           </label>
         </div>
-        <div className="flex justify-center sm:justify-end">
-          <AdminSaveButton saveState={saveState} onClick={onSave} />
+        <div className="w-full sm:flex sm:justify-end">
+          <AdminSaveButton saveState={saveState} onClick={onSave} className="w-full sm:w-auto" />
         </div>
       </div>
 
@@ -462,8 +462,8 @@ function HomeGalleryAdmin({ items, onChange, onSave, saveState }: HomeGalleryAdm
           title="Home Gallery (Homepage)"
           subtitle="Controls the Homepage Gallery section only (not the full Gallery page). Exactly 8 images."
         />
-        <div className="flex justify-center sm:justify-end">
-          <AdminSaveButton saveState={saveState} onClick={onSave} />
+        <div className="w-full sm:flex sm:justify-end">
+          <AdminSaveButton saveState={saveState} onClick={onSave} className="w-full sm:w-auto" />
         </div>
       </div>
 
@@ -643,8 +643,8 @@ function AboutImagesAdmin({ images, onChange, onSave, saveState }: AboutImagesAd
           title="About Images"
           subtitle="Used on both the Homepage About section and the About page."
         />
-        <div className="flex justify-center sm:justify-end">
-          <AdminSaveButton saveState={saveState} onClick={onSave} />
+        <div className="w-full sm:flex sm:justify-end">
+          <AdminSaveButton saveState={saveState} onClick={onSave} className="w-full sm:w-auto" />
         </div>
       </div>
 

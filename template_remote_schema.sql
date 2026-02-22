@@ -1,0 +1,380 @@
+CREATE INDEX idx_admin_sessions_expires ON admin_sessions(expires_at);
+
+CREATE INDEX idx_admin_sessions_token_hash ON admin_sessions(token_hash);
+
+CREATE INDEX idx_categories_name ON categories(name);
+
+CREATE INDEX idx_categories_slug ON categories(slug);
+
+CREATE INDEX idx_custom_invoices_created_at ON custom_invoices(created_at);
+
+CREATE INDEX idx_custom_invoices_customer_email ON custom_invoices(customer_email);
+
+CREATE INDEX idx_custom_invoices_status ON custom_invoices(status);
+
+CREATE INDEX idx_custom_orders_created_at ON custom_orders(created_at);
+
+CREATE UNIQUE INDEX idx_custom_orders_display_id ON custom_orders(display_custom_order_id);
+
+CREATE INDEX idx_custom_orders_status ON custom_orders(status);
+
+CREATE INDEX idx_custom_orders_stripe_payment_intent_id ON custom_orders(stripe_payment_intent_id);
+
+CREATE INDEX idx_custom_orders_stripe_session_id ON custom_orders(stripe_session_id);
+
+CREATE INDEX idx_email_list_created_at ON email_list(created_at);
+
+CREATE UNIQUE INDEX idx_email_list_email ON email_list(email);
+
+CREATE INDEX idx_gallery_images_created_at ON gallery_images(created_at);
+
+CREATE INDEX idx_gallery_images_sort_order ON gallery_images(sort_order);
+
+CREATE INDEX idx_images_created_at ON images(created_at);
+
+CREATE INDEX idx_images_entity ON images(entity_type, entity_id);
+
+CREATE INDEX idx_images_kind ON images(kind);
+
+CREATE UNIQUE INDEX idx_images_storage_key ON images(storage_key);
+
+CREATE INDEX idx_messages_created_at ON messages(created_at);
+
+CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+
+CREATE INDEX idx_order_items_product_id ON order_items(product_id);
+
+CREATE INDEX idx_order_rate_quotes_expires ON order_rate_quotes(expires_at);
+
+CREATE UNIQUE INDEX idx_order_rate_quotes_order_key ON order_rate_quotes(order_id, shipment_temp_key);
+
+CREATE INDEX idx_order_shipments_label_state ON order_shipments(label_state);
+
+CREATE INDEX idx_order_shipments_order ON order_shipments(order_id);
+
+CREATE UNIQUE INDEX idx_order_shipments_order_parcel ON order_shipments(order_id, parcel_index);
+
+CREATE INDEX idx_order_shipments_purchased_at ON order_shipments(purchased_at);
+
+CREATE INDEX idx_orders_created_at ON orders(created_at);
+
+CREATE UNIQUE INDEX idx_orders_display_order_id ON orders(display_order_id);
+
+CREATE INDEX idx_orders_payment_intent ON orders(stripe_payment_intent_id);
+
+CREATE INDEX idx_products_category ON products(category);
+
+CREATE INDEX idx_products_created_at ON products(created_at);
+
+CREATE INDEX idx_products_is_active ON products(is_active);
+
+CREATE INDEX idx_products_is_one_off ON products(is_one_off);
+
+CREATE INDEX idx_products_is_sold ON products(is_sold);
+
+CREATE INDEX idx_products_slug ON products(slug);
+
+CREATE INDEX idx_products_stripe_product_id ON products(stripe_product_id);
+
+CREATE UNIQUE INDEX idx_promo_codes_code ON promo_codes(code);
+
+CREATE INDEX idx_promo_codes_enabled ON promo_codes(enabled);
+
+CREATE INDEX idx_promotions_enabled ON promotions(enabled);
+
+CREATE TABLE _cf_KV (
+        key TEXT PRIMARY KEY,
+        value BLOB
+      ) WITHOUT ROWID;
+
+CREATE TABLE admin_sessions (
+  id TEXT PRIMARY KEY,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  revoked_at TEXT,
+  ip TEXT,
+  user_agent TEXT
+);
+
+CREATE TABLE categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    subtitle TEXT,
+    slug TEXT NOT NULL,
+    image_url TEXT,
+    hero_image_url TEXT,
+    image_id TEXT,
+    hero_image_id TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    option_group_label TEXT,
+    option_group_options_json TEXT,
+    show_on_homepage INTEGER DEFAULT 0,
+    shipping_cents INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+CREATE TABLE custom_invoices (
+  id TEXT PRIMARY KEY,
+  customer_email TEXT NOT NULL,
+  customer_name TEXT,
+  amount_cents INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'usd',
+  description TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft',
+  stripe_checkout_session_id TEXT,
+  stripe_payment_intent_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  sent_at TEXT,
+  paid_at TEXT
+);
+
+CREATE TABLE custom_order_counters (
+    year INTEGER PRIMARY KEY,
+    counter INTEGER NOT NULL
+  );
+
+CREATE TABLE custom_order_examples (
+  id TEXT PRIMARY KEY,
+  image_url TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  tags_json TEXT NOT NULL DEFAULT '[]',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+, image_id TEXT);
+
+CREATE TABLE custom_orders (
+  id TEXT PRIMARY KEY,
+  customer_name TEXT,
+  customer_email TEXT,
+  description TEXT,
+  amount INTEGER,
+  message_id TEXT,
+  status TEXT DEFAULT 'pending',
+  payment_link TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+, display_custom_order_id TEXT, stripe_session_id TEXT, stripe_payment_intent_id TEXT, paid_at TEXT, image_url TEXT, image_id TEXT, image_storage_key TEXT, shipping_cents INTEGER NOT NULL DEFAULT 0, show_on_sold_products INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0, archived_at TEXT, shipping_name TEXT, shipping_line1 TEXT, shipping_line2 TEXT, shipping_city TEXT, shipping_state TEXT, shipping_postal_code TEXT, shipping_country TEXT, shipping_phone TEXT);
+
+CREATE TABLE d1_migrations(
+		id         INTEGER PRIMARY KEY AUTOINCREMENT,
+		name       TEXT UNIQUE,
+		applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE email_list (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+
+CREATE TABLE email_logs (
+  id TEXT PRIMARY KEY,
+  type TEXT,
+  to_email TEXT,
+  resend_id TEXT,
+  status TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  error TEXT
+);
+
+CREATE TABLE gallery_images (
+    id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    image_url TEXT,
+    image_id TEXT,
+    alt_text TEXT,
+    hidden INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    position INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+CREATE TABLE images (
+  id TEXT PRIMARY KEY,
+  storage_provider TEXT NOT NULL DEFAULT 'r2',
+  storage_key TEXT NOT NULL,
+  public_url TEXT,
+  content_type TEXT,
+  size_bytes INTEGER,
+  original_filename TEXT,
+  entity_type TEXT,
+  entity_id TEXT,
+  kind TEXT,
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE messages (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  email TEXT,
+  message TEXT,
+  image_url TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+, type TEXT NOT NULL DEFAULT 'message', category_id TEXT, category_name TEXT, category_ids_json TEXT, category_names_json TEXT, is_read INTEGER NOT NULL DEFAULT 0, read_at TEXT, inspo_example_id TEXT, inspo_title TEXT, inspo_image_url TEXT, image_id TEXT);
+
+CREATE TABLE order_counters (
+  year INTEGER PRIMARY KEY,
+  counter INTEGER NOT NULL
+);
+
+CREATE TABLE order_items (
+  id TEXT PRIMARY KEY,
+  order_id TEXT,
+  product_id TEXT,
+  quantity INTEGER,
+  price_cents INTEGER,
+  image_url TEXT,
+  option_group_label TEXT,
+  option_value TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE order_rate_quotes (
+        id TEXT PRIMARY KEY,
+        order_id TEXT NOT NULL,
+        shipment_temp_key TEXT NOT NULL,
+        rates_json TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        expires_at TEXT NOT NULL,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+      );
+
+CREATE TABLE order_shipments (
+        id TEXT PRIMARY KEY,
+        order_id TEXT NOT NULL,
+        parcel_index INTEGER NOT NULL,
+        box_preset_id TEXT,
+        custom_length_in REAL,
+        custom_width_in REAL,
+        custom_height_in REAL,
+        weight_lb REAL NOT NULL,
+        easyship_shipment_id TEXT,
+        easyship_label_id TEXT,
+        carrier TEXT,
+        service TEXT,
+        tracking_number TEXT,
+        label_url TEXT,
+        label_cost_amount_cents INTEGER,
+        label_currency TEXT NOT NULL DEFAULT 'USD',
+        label_state TEXT NOT NULL DEFAULT 'pending',
+        quote_selected_id TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        purchased_at TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')), tracking_email_sent_at TEXT,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (box_preset_id) REFERENCES shipping_box_presets(id) ON DELETE SET NULL,
+        CHECK (label_state IN ('pending', 'generated', 'failed'))
+      );
+
+CREATE TABLE orders (
+  id TEXT PRIMARY KEY,
+  display_order_id TEXT,
+  order_type TEXT,
+  stripe_payment_intent_id TEXT,
+  total_cents INTEGER,
+  amount_total_cents INTEGER,
+  amount_subtotal_cents INTEGER,
+  amount_shipping_cents INTEGER,
+  amount_tax_cents INTEGER,
+  amount_discount_cents INTEGER,
+  currency TEXT,
+  customer_email TEXT,
+  shipping_name TEXT,
+  shipping_address_json TEXT,
+  card_last4 TEXT,
+  card_brand TEXT,
+  description TEXT,
+  shipping_cents INTEGER DEFAULT 0,
+  promo_code TEXT,
+  promo_percent_off INTEGER,
+  promo_free_shipping INTEGER,
+  promo_source TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+, is_seen INTEGER NOT NULL DEFAULT 0, seen_at TEXT, shipping_phone TEXT);
+
+CREATE TABLE products (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  slug TEXT,
+  description TEXT,
+  price_cents INTEGER,
+  category TEXT,
+  image_url TEXT,
+  image_urls_json TEXT,
+  is_active INTEGER DEFAULT 1,
+  is_one_off INTEGER DEFAULT 1,
+  is_sold INTEGER DEFAULT 0,
+  quantity_available INTEGER DEFAULT 1,
+  stripe_price_id TEXT,
+  stripe_product_id TEXT,
+  collection TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+, primary_image_id TEXT, image_ids_json TEXT, shipping_override_enabled INTEGER NOT NULL DEFAULT 0, shipping_override_amount_cents INTEGER);
+
+CREATE TABLE promo_codes (
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  percent_off INTEGER,
+  free_shipping INTEGER NOT NULL DEFAULT 0,
+  scope TEXT NOT NULL CHECK (scope IN ('global','categories')),
+  category_slugs_json TEXT NOT NULL DEFAULT '[]',
+  starts_at TEXT,
+  ends_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE promotions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  percent_off INTEGER NOT NULL,
+  scope TEXT NOT NULL CHECK (scope IN ('global','categories')),
+  category_slugs_json TEXT NOT NULL DEFAULT '[]',
+  banner_enabled INTEGER NOT NULL DEFAULT 0,
+  banner_text TEXT NOT NULL DEFAULT '',
+  starts_at TEXT,
+  ends_at TEXT,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE shipping_box_presets (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        length_in REAL NOT NULL,
+        width_in REAL NOT NULL,
+        height_in REAL NOT NULL,
+        default_weight_lb REAL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+CREATE TABLE site_content (
+    key TEXT PRIMARY KEY,
+    json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+CREATE TABLE site_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        ship_from_name TEXT,
+        ship_from_address1 TEXT,
+        ship_from_address2 TEXT,
+        ship_from_city TEXT,
+        ship_from_state TEXT,
+        ship_from_postal TEXT,
+        ship_from_country TEXT NOT NULL DEFAULT 'US',
+        ship_from_phone TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+CREATE TABLE sqlite_sequence(name,seq);

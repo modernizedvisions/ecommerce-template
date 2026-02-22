@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCcw } from 'lucide-react';
+import { Package, RefreshCcw } from 'lucide-react';
 import { AdminSectionHeader } from './AdminSectionHeader';
 import type { AdminOrder } from '../../lib/db/orders';
 import { formatEasternDateTime } from '../../lib/dates';
@@ -70,50 +70,64 @@ export function AdminOrdersTab({
         </div>
       ) : (
         <>
-          <div className="sm:hidden">
-            <table className="min-w-full divide-y divide-driftwood/50">
+          <div className="sm:hidden w-full overflow-x-hidden">
+            <table className="w-full table-fixed min-w-0 divide-y divide-driftwood/50">
               <thead className="bg-linen/70">
                 <tr>
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Customer</th>
-                  <th className="px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Total</th>
-                  <th className="px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Actions</th>
+                  <th className="w-2/5 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Customer</th>
+                  <th className="w-1/5 px-4 py-3 text-center align-middle text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Total</th>
+                  <th className="w-2/5 px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-deep-ocean/70">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white/80 divide-y divide-driftwood/40">
-                {filteredOrders.map((order) => (
-                  <tr key={order.id}>
-                    <td className="px-4 py-4 text-sm text-charcoal whitespace-normal break-words leading-tight">
-                      <div className="flex items-center gap-2">
-                        <span>{order.shippingName || order.customerName || 'Customer'}</span>
-                        {order.isSeen === false && (
-                          <span className="inline-flex h-2 w-2 rounded-ui bg-soft-gold ring-1 ring-deep-ocean/20" aria-label="Unseen order" />
-                        )}
-                      </div>
-                      <div className="text-xs text-charcoal/60">{order.customerEmail || 'No email'}</div>
-                    </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap text-sm text-charcoal">
-                      ${(((order.amountTotalCents ?? order.totalCents) || 0) / 100).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onSelectOrder(order)}
-                          className="lux-button--ghost px-3 py-1 text-[10px]"
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onOpenShipping(order)}
-                          className="lux-button--ghost px-3 py-1 text-[10px]"
-                        >
-                          Shipping
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filteredOrders.map((order) => {
+                  const customerDisplayName = order.shippingName || order.customerName || 'Customer';
+                  const customerNameParts = customerDisplayName.trim().split(/\s+/).filter(Boolean);
+                  const shouldSplitCustomerName = customerNameParts.length >= 2 && customerDisplayName.length >= 14;
+                  const customerFirstLine = shouldSplitCustomerName ? customerNameParts[0] : customerDisplayName;
+                  const customerSecondLine = shouldSplitCustomerName ? customerNameParts.slice(1).join(' ') : '';
+
+                  return (
+                    <tr key={order.id}>
+                      <td className="min-w-0 px-4 py-4 text-sm text-charcoal whitespace-normal break-words leading-tight">
+                        <div className="flex min-w-0 items-start gap-2">
+                          <span className="min-w-0 break-words">
+                            <span className="block">{customerFirstLine}</span>
+                            {shouldSplitCustomerName && <span className="block">{customerSecondLine}</span>}
+                          </span>
+                          {order.isSeen === false && (
+                            <span
+                              className="inline-flex h-2 w-2 shrink-0 rounded-ui bg-soft-gold ring-1 ring-deep-ocean/20"
+                              aria-label="Unseen order"
+                            />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-center align-middle whitespace-nowrap text-sm tabular-nums text-charcoal">
+                        ${(((order.amountTotalCents ?? order.totalCents) || 0) / 100).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <div className="flex min-w-0 flex-col items-stretch justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onSelectOrder(order)}
+                            className="lux-button--ghost w-full px-3 py-1 text-[10px]"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onOpenShipping(order)}
+                            className="lux-button--ghost w-full px-3 py-1 text-[10px] inline-flex items-center justify-center"
+                            aria-label="Shipping"
+                          >
+                            <Package className="h-3.5 w-3.5" aria-hidden="true" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -67,7 +67,7 @@ export function AdminEmailListTab() {
           subtitle="Emails collected from the public /join page."
           className="mb-0"
         />
-        <div className="absolute right-0 top-0 flex flex-wrap items-center justify-end gap-2">
+        <div className="hidden sm:flex sm:absolute sm:right-0 sm:top-0 sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
           <button
             type="button"
             className="lux-button--ghost px-3 py-2 text-[10px] disabled:opacity-60"
@@ -95,6 +95,34 @@ export function AdminEmailListTab() {
             Copy All
           </button>
         </div>
+      </div>
+      <div className="flex w-full gap-3 sm:hidden">
+        <button
+          type="button"
+          className="lux-button--ghost flex-1 px-3 py-2 text-[10px] disabled:opacity-60"
+          disabled={loading}
+          onClick={() => void load()}
+        >
+          {loading ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Loading
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-2">
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Refresh
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          className="lux-button flex-1 px-3 py-2 text-[10px] disabled:opacity-60"
+          onClick={() => void handleCopyAll()}
+          disabled={sortedItems.length === 0}
+        >
+          Copy All
+        </button>
       </div>
 
       {error && (

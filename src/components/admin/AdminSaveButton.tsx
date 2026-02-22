@@ -7,6 +7,7 @@ interface AdminSaveButtonProps {
   onClick: () => void;
   disabled?: boolean;
   idleLabel?: string;
+  className?: string;
 }
 
 export function AdminSaveButton({
@@ -14,13 +15,14 @@ export function AdminSaveButton({
   onClick,
   disabled = false,
   idleLabel = 'Save',
+  className = '',
 }: AdminSaveButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled || saveState === 'saving'}
-      className="lux-button px-4 py-2 text-[11px] tracking-[0.22em]"
+      className={`lux-button px-4 py-2 text-[11px] tracking-[0.22em] ${className}`.trim()}
     >
       {saveState === 'saving' ? (
         <>

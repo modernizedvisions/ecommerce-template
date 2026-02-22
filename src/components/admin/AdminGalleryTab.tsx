@@ -271,7 +271,8 @@ function GalleryAdmin({
             saveState={saveState}
             onClick={onSave}
             disabled={saveState === 'saving' || hasBlockingIssues}
-            idleLabel="Save Changes"
+            idleLabel="SAVE"
+            className="sm:w-auto"
           />
           <button
             type="button"

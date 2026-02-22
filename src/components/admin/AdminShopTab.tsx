@@ -497,7 +497,7 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="space-y-2 pt-2 md:mt-auto">
+                  <div className="hidden space-y-2 pt-2 md:mt-auto sm:block">
                     <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="submit"
@@ -735,6 +735,48 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
                     </div>
                   );
                 })}
+              </div>
+
+              <div className="space-y-2 pt-2 sm:hidden">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={
+                      productSaveState === 'saving' ||
+                      isUploading ||
+                      failedCount > 0 ||
+                      missingUrlCount > 0 ||
+                      createOverrideAmountInvalid ||
+                      !hasCategories
+                    }
+                    className="lux-button px-4 py-2 text-[10px] disabled:opacity-50 shrink-0"
+                  >
+                    {productSaveState === 'saving' ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-white/80" />
+                        <span>Saving...</span>
+                      </span>
+                    ) : (
+                      'Save Product'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onResetProductForm}
+                    className="lux-button--ghost px-4 py-2 text-[10px] shrink-0"
+                  >
+                    Clear
+                  </button>
+                </div>
+                {addProductStatusMessages.length > 0 && (
+                  <div className="w-full space-y-1">
+                    {addProductStatusMessages.map((message) => (
+                      <p key={message} className="text-xs text-charcoal/60 leading-snug">
+                        {message}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             </aside>
           </div>

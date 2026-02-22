@@ -322,14 +322,14 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
           subtitle="Manage bespoke customer requests and payment links."
           className="mb-0"
         />
-        <div className="absolute right-0 top-0 flex flex-wrap items-center justify-end gap-2">
+        <div className="mt-3 flex w-full flex-col gap-2 sm:absolute sm:right-0 sm:top-0 sm:mt-0 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <button
             type="button"
             onClick={() => {
               reset(draftDefaults || { customerName: '', customerEmail: '', description: '', amount: '' });
               setIsModalOpen(true);
             }}
-            className="lux-button px-4 py-2 text-[10px]"
+            className="lux-button w-full px-4 py-2 text-[10px] sm:w-auto"
           >
             New Custom Order
           </button>
@@ -337,7 +337,7 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
             <button
               type="button"
               onClick={() => onReloadOrders?.()}
-              className="lux-button--ghost px-3 py-2 text-[10px]"
+              className="lux-button--ghost w-full px-3 py-2 text-[10px] sm:w-auto"
             >
               Debug: Reload
             </button>

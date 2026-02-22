@@ -406,9 +406,6 @@ export function AdminShippingSettingsTab() {
                   onChange={(e) => setShipFrom((prev) => ({ ...prev, shipFromState: e.target.value }))}
                 />
               )}
-              {shipFromCountryIsUS && (
-                <p className="mt-1 text-xs text-charcoal/60">Use state abbreviation (e.g., NY, PA).</p>
-              )}
               {shipFromStateNeedsReselection && shipFromCountryIsUS && (
                 <p className="mt-1 text-xs text-amber-700">
                   Saved state value is not a valid US abbreviation. Please reselect.

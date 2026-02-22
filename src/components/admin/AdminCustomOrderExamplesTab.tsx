@@ -213,14 +213,24 @@ export function AdminCustomOrderExamplesTab() {
             subtitle="Manage the 9 custom examples shown on the Custom Orders page."
           />
         </div>
-        <div className="absolute right-0 top-0">
+        <div className="hidden sm:block sm:absolute sm:right-0 sm:top-0">
           <AdminSaveButton
             saveState={saveState}
             onClick={handleSave}
             disabled={saveState === 'saving' || hasBlockingIssues}
-            idleLabel="Save Examples"
+            idleLabel="SAVE"
+            className="sm:w-auto"
           />
         </div>
+      </div>
+      <div className="mt-3 sm:hidden">
+        <AdminSaveButton
+          saveState={saveState}
+          onClick={handleSave}
+          disabled={saveState === 'saving' || hasBlockingIssues}
+          idleLabel="SAVE"
+          className="w-full sm:w-auto"
+        />
       </div>
 
       {isLoading ? (
