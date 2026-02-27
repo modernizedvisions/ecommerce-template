@@ -84,7 +84,8 @@ export async function onRequestPost(context: { request: Request; env: ShippingLa
       return jsonResponse({ ok: false, error: 'Invalid JSON body' }, 400);
     }
 
-    const shipFromName = trimOrNull(body.shipFromName) || '';
+    const shipFromName = trimOrNull(body.shipFromName) || 'Mia Reynolds';
+    const shipFromCompany = trimOrNull(body.shipFromCompany) || 'Admin Demo';
     const shipFromAddress1 = trimOrNull(body.shipFromAddress1) || '';
     const shipFromAddress2 = trimOrNull(body.shipFromAddress2) || '';
     const shipFromCity = trimOrNull(body.shipFromCity) || '';
@@ -108,6 +109,7 @@ export async function onRequestPost(context: { request: Request; env: ShippingLa
     await context.env.DB.prepare(
       `UPDATE site_settings
        SET ship_from_name = ?,
+           ship_from_company = ?,
            ship_from_address1 = ?,
            ship_from_address2 = ?,
            ship_from_city = ?,
@@ -120,6 +122,7 @@ export async function onRequestPost(context: { request: Request; env: ShippingLa
     )
       .bind(
         shipFromName,
+        shipFromCompany,
         shipFromAddress1,
         shipFromAddress2,
         shipFromCity,

@@ -1199,18 +1199,33 @@ export function AdminPage() {
 
   return (
     <>
-    <div className="admin-page py-6 overflow-x-hidden">
+    <div className={`admin-page overflow-x-hidden ${demoMode ? 'pb-6' : 'py-6'}`}>
+      {demoMode && (
+        <div className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--card)]">
+          <div className="mx-auto w-full max-w-[80rem] px-4 py-2">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <div />
+              <div className="text-center text-xs sm:text-sm text-[var(--text2)]">
+                <span className="font-medium text-[var(--text)]">Public Demo Mode</span>
+                <span className="mx-2 text-[var(--muted)]">|</span>
+                <span>Changes reset on refresh</span>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={handleLogout}
+                  className="admin-btn-primary h-8 px-3 text-[10px]"
+                >
+                  Reset Demo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="admin-shell">
-        <div className="flex justify-between items-center mb-8">
+        <div className="mb-8 flex items-center justify-between">
           <h1 className="admin-header">Admin Dashboard</h1>
-          {demoMode ? (
-            <button
-              onClick={handleLogout}
-              className="admin-btn-primary px-4 py-2 text-[10px]"
-            >
-              Reset Demo
-            </button>
-          ) : (
+          {!demoMode && (
             <button
               onClick={handleLogout}
               className="admin-btn-secondary px-4 py-2 text-[10px]"
@@ -1219,11 +1234,6 @@ export function AdminPage() {
             </button>
           )}
         </div>
-        {demoMode && (
-          <div className="admin-alert admin-alert-warning mb-4">
-            Public Demo Mode - changes reset on refresh
-          </div>
-        )}
 
           <div className="admin-tabs mb-6">
           <nav className="flex gap-3 justify-start md:justify-center overflow-x-auto overflow-y-visible whitespace-nowrap -mx-4 px-4 py-2 md:mx-0 md:px-0">

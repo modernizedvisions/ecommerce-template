@@ -16,6 +16,7 @@ export type ShippingLabelsEnv = {
 type SiteSettingsRow = {
   id: number;
   ship_from_name: string | null;
+  ship_from_company: string | null;
   ship_from_address1: string | null;
   ship_from_address2: string | null;
   ship_from_city: string | null;
@@ -140,6 +141,7 @@ const normalizeCountryCode = (value: string): string => value.trim().toUpperCase
 
 const isValidUSStateCode = (value: string): boolean => US_STATE_CODES.has(value.trim().toUpperCase());
 const DEFAULT_SHIP_FROM_COMPANY = 'Admin Demo';
+const DEFAULT_SHIP_FROM_NAME = 'Mia Reynolds';
 
 const toFiniteNumberOrNull = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
@@ -166,6 +168,7 @@ export async function ensureShippingLabelsSchema(db: D1Database): Promise<void> 
       `CREATE TABLE IF NOT EXISTS site_settings (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         ship_from_name TEXT,
+        ship_from_company TEXT,
         ship_from_address1 TEXT,
         ship_from_address2 TEXT,
         ship_from_city TEXT,
@@ -178,6 +181,17 @@ export async function ensureShippingLabelsSchema(db: D1Database): Promise<void> 
     )
     .run();
   await db.prepare(`INSERT OR IGNORE INTO site_settings (id, ship_from_country) VALUES (1, 'US');`).run();
+
+  const siteSettingsTable = await db
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'site_settings' LIMIT 1;`)
+    .first<{ name: string }>();
+  if (siteSettingsTable?.name) {
+    const siteSettingsColumns = await db.prepare(`PRAGMA table_info(site_settings);`).all<{ name: string }>();
+    const siteSettingsColumnNames = new Set((siteSettingsColumns.results || []).map((column) => column.name));
+    if (!siteSettingsColumnNames.has('ship_from_company')) {
+      await db.prepare(`ALTER TABLE site_settings ADD COLUMN ship_from_company TEXT;`).run();
+    }
+  }
 
   await db
     .prepare(
@@ -353,14 +367,14 @@ type EasyshipOrderItemRow = {
 export async function readShippingSettings(db: D1Database): Promise<ShipFromSettings> {
   const row = await db
     .prepare(
-      `SELECT id, ship_from_name, ship_from_address1, ship_from_address2, ship_from_city, ship_from_state, ship_from_postal, ship_from_country, ship_from_phone, updated_at
+      `SELECT id, ship_from_name, ship_from_company, ship_from_address1, ship_from_address2, ship_from_city, ship_from_state, ship_from_postal, ship_from_country, ship_from_phone, updated_at
        FROM site_settings WHERE id = 1;`
     )
     .first<SiteSettingsRow>();
 
   return {
-    shipFromName: row?.ship_from_name ?? '',
-    shipFromCompany: DEFAULT_SHIP_FROM_COMPANY,
+    shipFromName: row?.ship_from_name ?? DEFAULT_SHIP_FROM_NAME,
+    shipFromCompany: row?.ship_from_company ?? DEFAULT_SHIP_FROM_COMPANY,
     shipFromAddress1: row?.ship_from_address1 ?? '',
     shipFromAddress2: row?.ship_from_address2 ?? '',
     shipFromCity: row?.ship_from_city ?? '',
