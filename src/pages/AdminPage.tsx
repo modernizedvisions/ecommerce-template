@@ -27,6 +27,7 @@ import { AdminPromotionsTab } from '../components/admin/AdminPromotionsTab';
 import { AdminShippingSettingsTab } from '../components/admin/AdminShippingSettingsTab';
 import { ShippingLabelsModal } from '../components/admin/ShippingLabelsModal';
 import { AdminEmailListTab } from '../components/admin/AdminEmailListTab';
+import { TabCountBadge } from '../components/admin/TabCountBadge';
 import { toast } from 'sonner';
 import {
   getAdminCustomOrders,
@@ -104,6 +105,9 @@ type ParsedUploadError = {
 const SHOP_UPLOAD_NO_FILE_MESSAGE = import.meta.env.DEV
   ? 'Upload not started: missing file reference'
   : 'Upload reference missing. Re-select the image.';
+const SHOP_UPLOAD_DEBUG =
+  import.meta.env.DEV &&
+  (import.meta.env.VITE_DEBUG_SHOP_UPLOADS === '1' || import.meta.env.VITE_DEMO_ADMIN === '1');
 
 const parseUploadError = (error: unknown): ParsedUploadError => {
   const raw = error instanceof Error ? error.message : String(error || 'Upload failed');
@@ -119,33 +123,13 @@ const parseUploadError = (error: unknown): ParsedUploadError => {
 };
 
 const debugShopUpload = (...args: unknown[]) => {
-  if (!import.meta.env.DEV) return;
+  if (!SHOP_UPLOAD_DEBUG) return;
   console.debug(...args);
 };
 
 const warnShopUpload = (...args: unknown[]) => {
-  if (!import.meta.env.DEV) return;
+  if (!SHOP_UPLOAD_DEBUG) return;
   console.warn(...args);
-};
-
-type AdminTabBadgeProps = {
-  count?: number | null;
-  isActive?: boolean;
-};
-
-const AdminTabBadge = ({ count, isActive }: AdminTabBadgeProps) => {
-  const safeCount = typeof count === 'number' && Number.isFinite(count) ? count : 0;
-  if (safeCount <= 0) return null;
-
-  return (
-    <span
-      className={`notif-circle absolute -top-1 -right-1 inline-flex h-5 w-5 items-center justify-center border border-[var(--border)] text-[10px] font-semibold leading-none shadow-sm ${
-        isActive ? 'ring-1 ring-white/70' : 'ring-1 ring-[rgba(15,15,15,0.15)]'
-      }`}
-    >
-      {safeCount > 9 ? '9+' : String(safeCount)}
-    </span>
-  );
 };
 
 type AdminTabKey =
@@ -198,6 +182,10 @@ const resolveTabFromPath = (pathname: string): AdminTabKey => {
 
 export function AdminPage() {
   const demoMode = isDemoAdmin();
+  // Demo mode keeps object URLs in memory for the current browser session.
+  const isImageUrlBlockedForPersistence = (value?: string) =>
+    demoMode ? isBase64ImageUrl(value) : isBlockedImageUrl(value);
+  const isReadyProductImageUrl = (value?: string) => !!value && !isImageUrlBlockedForPersistence(value);
   const navigate = useNavigate();
   const location = useLocation();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -512,7 +500,8 @@ export function AdminPage() {
       name: file.name,
       size: file.size,
       type: file.type,
-      endpoint: '/api/admin/images/upload?scope=products',
+      mode: demoMode ? 'demo-local' : 'server-upload',
+      endpoint: demoMode ? 'demo://local-image-upload' : '/api/admin/images/upload?scope=products',
     });
     setImages((prev) =>
       prev.map((img) =>
@@ -527,27 +516,29 @@ export function AdminPage() {
       )
     );
     try {
-      const result = await adminUploadImageUnified(file, {
-        scope: 'products',
-        onStatus: (status) => {
-          debugShopUpload('[shop images] C/D status', {
-            id,
-            name: file.name,
-            status,
+      const result = demoMode
+        ? await adminUploadImageUnified(file, { scope: 'products' })
+        : await adminUploadImageUnified(file, {
+            scope: 'products',
+            onStatus: (status) => {
+              debugShopUpload('[shop images] C/D status', {
+                id,
+                name: file.name,
+                status,
+              });
+              setImages((prev) =>
+                prev.map((img) =>
+                  img && img.id === id
+                    ? {
+                        ...img,
+                        uploading: true,
+                        optimizing: status === 'optimizing',
+                      }
+                    : img
+                )
+              );
+            },
           });
-          setImages((prev) =>
-            prev.map((img) =>
-              img && img.id === id
-                ? {
-                    ...img,
-                    uploading: true,
-                    optimizing: status === 'optimizing',
-                  }
-                : img
-            )
-          );
-        },
-      });
       if (previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
       setImages((prev) =>
         prev.map((img) =>
@@ -740,8 +731,7 @@ export function AdminPage() {
         const next = prev.map((img) => {
           if (!img) return img;
           if (!img.uploading) return img;
-          const hasFinalUrl =
-            !!img.url && !img.url.startsWith('blob:') && !img.url.startsWith('data:');
+          const hasFinalUrl = isReadyProductImageUrl(img.url);
           const hasError = !!img.uploadError;
           if (!hasFinalUrl && !hasError) {
             return {
@@ -918,7 +908,7 @@ export function AdminPage() {
     const urls = normalized
       .filter((img) => img && !img.uploading && !img.uploadError)
       .map((img) => img.url)
-      .filter((url) => !!url && !url.startsWith('blob:') && !url.startsWith('data:'));
+      .filter((url) => isReadyProductImageUrl(url));
     const unique = Array.from(new Set(urls));
     const primary = unique[0] || '';
     const rest = primary ? unique.filter((url) => url !== primary) : unique;
@@ -953,7 +943,7 @@ export function AdminPage() {
         imageId: ids[idx],
         isPrimary: idx === 0,
         isNew: false,
-        needsMigration: isBlockedImageUrl(url),
+        needsMigration: isImageUrlBlockedForPersistence(url),
       }));
     console.debug('[edit modal] images hydrated', managed);
     setEditProductImages(managed);
@@ -973,11 +963,12 @@ export function AdminPage() {
         img &&
         !img.uploading &&
         !img.uploadError &&
-        (!!img.file || isBlockedImageUrl(img.url) || (!!img.previewUrl && !img.url))
+        (!!img.file || isImageUrlBlockedForPersistence(img.url) || (!!img.previewUrl && !img.url))
     ).length;
     const failedCount = productImages.filter((img) => img?.uploadError).length;
     console.debug('[shop save] clicked', {
       mode: 'new',
+      demoMode,
       name: productForm.name,
       price: productForm.price,
       qty: productForm.quantityAvailable,
@@ -1015,14 +1006,15 @@ export function AdminPage() {
       }
 
       const manualUrls = mergeManualImages(productForm);
-      const base64Urls = findBase64Urls([
+      const blockedUrls = findBlockedImageUrls([
         ...manualUrls.imageUrls,
         ...productImages.map((img) => img?.url).filter((url): url is string => !!url),
-      ]);
-      const needsMigration = productImages.some((img) => img?.needsMigration);
-      if (needsMigration || base64Urls.length > 0) {
+      ], demoMode);
+      const needsMigration = productImages.some((img) => img?.needsMigration && !demoMode);
+      if (needsMigration || blockedUrls.length > 0) {
         console.error('[shop save] blocked: invalid image URLs detected. Re-upload images using Cloudflare upload.', {
-          base64Count: base64Urls.length,
+          blockedCount: blockedUrls.length,
+          demoMode,
         });
         throw new Error('Images must be uploaded first (no blob/data URLs).');
       }
@@ -1084,6 +1076,7 @@ export function AdminPage() {
     if (!editProductId || !editProductForm) return false;
     console.debug('[shop save] clicked', {
       mode: 'edit',
+      demoMode,
       name: editProductForm.name,
       price: editProductForm.price,
       qty: editProductForm.quantityAvailable,
@@ -1110,13 +1103,15 @@ export function AdminPage() {
         return false;
       }
 
-      const base64Urls = findBase64Urls(
-        editProductImages.map((img) => img?.url).filter((url): url is string => !!url)
+      const blockedUrls = findBlockedImageUrls(
+        editProductImages.map((img) => img?.url).filter((url): url is string => !!url),
+        demoMode
       );
-      const needsMigration = editProductImages.some((img) => img?.needsMigration);
-      if (needsMigration || base64Urls.length > 0) {
+      const needsMigration = editProductImages.some((img) => img?.needsMigration && !demoMode);
+      if (needsMigration || blockedUrls.length > 0) {
         console.error('[shop save] blocked: invalid image URLs detected. Re-upload images using Cloudflare upload.', {
-          base64Count: base64Urls.length,
+          blockedCount: blockedUrls.length,
+          demoMode,
         });
         throw new Error('Images must be uploaded first (no blob/data URLs).');
       }
@@ -1248,8 +1243,13 @@ export function AdminPage() {
                     isActive ? 'admin-tab-active' : ''
                   }`}
                 >
-                  {tab.label}
-                  <AdminTabBadge count={badge} isActive={isActive} />
+                  <span className="relative inline-flex items-center">
+                    <span>{tab.label}</span>
+                    <TabCountBadge
+                      count={badge ?? 0}
+                      className={`absolute -top-2 -right-2 ${isActive ? 'ring-2 ring-[var(--bg)]' : ''}`}
+                    />
+                  </span>
                 </button>
               );
             })}
@@ -1578,21 +1578,32 @@ function mergeImages(
   return { imageUrl, imageUrls: merged };
 }
 
+function isBlobImageUrl(value?: string) {
+  if (!value) return false;
+  return value.startsWith('blob:');
+}
+
+function isBase64ImageUrl(value?: string) {
+  if (!value) return false;
+  return value.startsWith('data:image/') || value.includes(';base64,');
+}
+
 function isBlockedImageUrl(value?: string) {
   if (!value) return false;
-  return value.startsWith('data:image/') || value.includes(';base64,') || value.startsWith('blob:');
+  return isBase64ImageUrl(value) || isBlobImageUrl(value);
 }
 
 function describeImageKinds(images: ManagedImage[]) {
   return images.map((img) => ({
-    isDataUrl: isBlockedImageUrl(img.url),
+    isDataUrl: isBase64ImageUrl(img.url),
+    isBlobUrl: isBlobImageUrl(img.url),
     urlPrefix: typeof img.url === 'string' ? img.url.slice(0, 30) : null,
     previewPrefix: img.previewUrl ? img.previewUrl.slice(0, 30) : null,
     needsMigration: !!img.needsMigration,
   }));
 }
 
-function findBase64Urls(urls: string[]) {
-  return urls.filter((url) => isBlockedImageUrl(url));
+function findBlockedImageUrls(urls: string[], demoMode: boolean) {
+  return urls.filter((url) => (demoMode ? isBase64ImageUrl(url) : isBlockedImageUrl(url)));
 }
 

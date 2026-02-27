@@ -16,6 +16,7 @@ import {
   type ShipFromSettings,
   type ShippingBoxPreset,
 } from '../../lib/adminShipping';
+import { AdminModal } from './AdminModal';
 
 type ParcelDraft = {
   boxPresetId: string;
@@ -551,31 +552,21 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
   if (!open || !order) return null;
 
   return (
-    <div
-      className="admin-modal-overlay z-50 px-3 py-6"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <AdminModal
+      open={open && !!order}
+      onClose={onClose}
+      title="Shipping Labels"
+      description={`Order ${order.displayOrderId || order.id}`}
+      maxWidth="5xl"
+      footer={
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} className="admin-btn-secondary px-4 py-2 text-[10px]">
+            Close
+          </button>
+        </div>
+      }
     >
-      <div
-        className="admin-modal-panel admin-theme relative w-full max-w-5xl p-6 max-h-[calc(100dvh-3.5rem)] overflow-y-auto"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-3 top-3 lux-button--ghost px-3 py-1 text-[10px]"
-        >
-          CLOSE
-        </button>
-
-        <div className="space-y-5">
-          <div>
-            <p className="lux-label text-[10px] mb-1">Shipping Labels</p>
-            <div className="text-xl font-semibold text-charcoal">
-              Order {order.displayOrderId || order.id}
-            </div>
-          </div>
+      <div className="space-y-5">
 
           {error && <div className="rounded-shell bg-rose-100 px-3 py-2 text-sm text-rose-700">{error}</div>}
 
@@ -1005,8 +996,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
               </div>
             </>
           )}
-        </div>
       </div>
-    </div>
+    </AdminModal>
   );
 }

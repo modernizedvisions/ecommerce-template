@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Loader2, Trash2 } from 'lucide-react';
 import type { Category, Product } from '../../lib/types';
 import type { ManagedImage, ProductFormState } from '../../pages/AdminPage';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { adminFetchCategories } from '../../lib/api';
+import { isDemoAdmin } from '../../lib/demoMode';
 import { AdminSectionHeader } from './AdminSectionHeader';
+import { AdminModal } from './AdminModal';
 import { CategoryManagementModal } from './CategoryManagementModal';
 import { ProgressiveImage } from '../ui/ProgressiveImage';
 
@@ -199,6 +200,7 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const isDev = import.meta.env.DEV;
+  const demoMode = isDemoAdmin();
   const hasCategories = categories.length > 0;
   const maxModalImages = 4;
   const isOptimizing = productImages.some((img) => img?.optimizing);
@@ -208,9 +210,10 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
       img &&
       !img.uploading &&
       !img.uploadError &&
+      // Demo mode uses blob: object URLs as the final "uploaded" image source.
       (!!img.file ||
         !!img.previewUrl ||
-        img.url?.startsWith('blob:') ||
+        (!demoMode && img.url?.startsWith('blob:')) ||
         img.url?.startsWith('data:'))
   ).length;
   const failedCount = productImages.filter((img) => img?.uploadError).length;
@@ -263,13 +266,23 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
   useEffect(() => {
     if (!isDev) return;
     console.debug('[shop save] disable check', {
+      demoMode,
       isUploading,
       uploadingCount: productImages.filter((img) => img?.uploading).length,
       missingUrlCount,
       failedCount,
       imageCount: productImages.length,
+      images: productImages.map((img) => ({
+        id: img?.id,
+        uploading: !!img?.uploading,
+        optimizing: !!img?.optimizing,
+        hasFile: !!img?.file,
+        hasPreview: !!img?.previewUrl,
+        hasError: !!img?.uploadError,
+        urlPrefix: img?.url?.slice(0, 24) || null,
+      })),
     });
-  }, [failedCount, isDev, isUploading, missingUrlCount, productImages]);
+  }, [demoMode, failedCount, isDev, isUploading, missingUrlCount, productImages]);
 
   const normalizeCategory = (value: string | undefined | null) => (value || '').trim().toLowerCase();
   const getProductCategories = (product: Product): string[] => {
@@ -627,6 +640,11 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
                   }}
                 />
               </div>
+              {demoMode && (
+                <p className="text-[11px] text-charcoal/60">
+                  Images are stored locally for this demo session.
+                </p>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 4 }).map((_, index) => {
@@ -856,49 +874,54 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
         )}
       </div>
 
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="flex min-h-0 flex-col p-0 bg-white">
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const ok = await onUpdateProduct(e);
-              if (ok) {
-                setIsEditModalOpen(false);
-              }
-            }}
-            className="flex min-h-0 flex-1 flex-col overflow-y-auto"
-          >
-            <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-driftwood/60 bg-white px-6 py-4">
-              <DialogTitle>Edit Product</DialogTitle>
-              <div className="flex items-center gap-2">
-                {editProductId && (
-                  <button
-                    type="button"
-                    onClick={() => setIsDeleteConfirmOpen(true)}
-                    className="lux-button--ghost px-2 py-1 text-[10px] !text-rose-700"
-                    aria-label="Delete product"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="lux-button--ghost px-3 py-1 text-[10px]"
-                >
-                  CLOSE
-                </button>
-                <button
-                  type="submit"
-                  disabled={editProductSaveState === 'saving' || editOverrideAmountInvalid || !hasCategories}
-                  className="lux-button px-3 py-1 text-[10px] disabled:opacity-50"
-                >
-                  {editProductSaveState === 'saving' ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-4 px-6 pb-6">
+      <AdminModal
+        open={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Edit Product"
+        maxWidth="4xl"
+        headerActions={
+          editProductId ? (
+            <button
+              type="button"
+              onClick={() => setIsDeleteConfirmOpen(true)}
+              className="admin-btn-ghost px-2 py-1 text-[10px] !text-rose-700"
+              aria-label="Delete product"
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
+          ) : null
+        }
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(false)}
+              className="admin-btn-secondary px-4 py-2 text-[10px]"
+            >
+              Close
+            </button>
+            <button
+              type="submit"
+              form="edit-product-form"
+              disabled={editProductSaveState === 'saving' || editOverrideAmountInvalid || !hasCategories}
+              className="admin-btn-primary px-4 py-2 text-[10px] disabled:opacity-50"
+            >
+              {editProductSaveState === 'saving' ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        }
+      >
+        <form
+          id="edit-product-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const ok = await onUpdateProduct(e);
+            if (ok) {
+              setIsEditModalOpen(false);
+            }
+          }}
+          className="space-y-4"
+        >
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-4">
                   <div>
@@ -1139,10 +1162,8 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+        </form>
+      </AdminModal>
       <ConfirmDialog
         open={isDeleteConfirmOpen}
         title="Are you sure?"

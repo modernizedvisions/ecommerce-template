@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Copy, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { adminDeleteMessage } from '../../lib/api';
 import { adminFetch } from '../../lib/adminAuth';
 import { isDemoAdmin } from '../../lib/demoMode';
 import { listMessages, markMessageRead as markDemoMessageRead } from '../../lib/adminClient';
 import { AdminSectionHeader } from './AdminSectionHeader';
+import { AdminModal } from './AdminModal';
 import { formatEasternDateTime } from '../../lib/dates';
 
 interface AdminMessage {
@@ -310,43 +310,43 @@ export const AdminMessagesTab: React.FC<AdminMessagesTabProps> = ({ onCreateCust
         </>
       )}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="relative">
-          <div className="absolute right-3 top-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleDeleteMessage}
-              className="lux-button--ghost px-2.5 py-1 text-[10px] !text-rose-700 flex items-center"
-              aria-label="Delete message"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleCloseDialog}
-              className="lux-button--ghost px-3 py-1 text-[10px]"
-            >
-              CLOSE
+      <AdminModal
+        open={isDialogOpen && !!selectedMessage}
+        onClose={handleCloseDialog}
+        title="Message Details"
+        maxWidth="3xl"
+        headerActions={
+          <button
+            type="button"
+            onClick={handleDeleteMessage}
+            className="admin-btn-ghost px-2.5 py-1 text-[10px] !text-rose-700 flex items-center"
+            aria-label="Delete message"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        }
+        footer={
+          <div className="flex justify-end">
+            <button type="button" onClick={handleCloseDialog} className="admin-btn-secondary px-4 py-2 text-[10px]">
+              Close
             </button>
           </div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="lux-heading text-lg">Message Details</h2>
+        }
+      >
+        {selectedMessage?.type === 'custom_order' && onCreateCustomOrderFromMessage && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={handleCreateCustomOrder}
+              className="lux-button px-4 py-2 text-[10px]"
+            >
+              Create Custom Order
+            </button>
           </div>
-          {selectedMessage?.type === 'custom_order' && onCreateCustomOrderFromMessage && (
-            <div className="mb-4">
-              <button
-                type="button"
-                onClick={handleCreateCustomOrder}
-                className="lux-button px-4 py-2 text-[10px]"
-              >
-                Create Custom Order
-              </button>
-            </div>
-          )}
+        )}
 
-          <div className="max-h-[80vh] overflow-y-auto overflow-x-hidden">
-            {selectedMessage && (
-              <div className="space-y-4">
+        {selectedMessage && (
+          <div className="space-y-4">
                 <div>
                   <p className="lux-label text-[10px]">Type</p>
                   <p className="text-sm text-charcoal">{getTypeLabel(selectedMessage.type)}</p>
@@ -454,11 +454,9 @@ export const AdminMessagesTab: React.FC<AdminMessagesTabProps> = ({ onCreateCust
                     </div>
                   </div>
                 )}
-              </div>
-            )}
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </AdminModal>
       <ConfirmDialog
         open={isDeleteConfirmOpen}
         title="Are you sure?"

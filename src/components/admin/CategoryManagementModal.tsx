@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Loader2, Trash2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AdminModal } from './AdminModal';
 import { adminCreateCategory, adminDeleteCategory, adminFetchCategories, adminUpdateCategory } from '../../lib/api';
 import type { Category } from '../../lib/types';
 
@@ -274,28 +274,21 @@ export function CategoryManagementModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="flex w-full max-w-3xl max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 bg-white">
-        {/* Keep header fixed and allow body to scroll within the modal. */}
-        <div className="flex items-start justify-between gap-3 border-b border-driftwood/60 px-6 pt-6 pb-4">
-          <DialogHeader className="space-y-1">
-            <DialogTitle className="text-center lux-heading text-lg">
-              Category Management
-            </DialogTitle>
-            <p className="text-center text-sm text-charcoal/70">
-              Add or delete categories available to products.
-            </p>
-          </DialogHeader>
-          <button
-            type="button"
-            onClick={onClose}
-            className="lux-button--ghost px-3 py-1 text-[10px]"
-          >
-            CLOSE
+    <AdminModal
+      open={open}
+      onClose={onClose}
+      title="Category Management"
+      description="Add or delete categories available to products."
+      maxWidth="3xl"
+      footer={
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} className="admin-btn-secondary px-4 py-2 text-[10px]">
+            Close
           </button>
         </div>
-
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-6 pt-4">
+      }
+    >
+      <div className="px-0 pb-2 pt-0">
           {categoryMessage && (
             <div className="rounded-shell border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {categoryMessage}
@@ -641,8 +634,7 @@ export function CategoryManagementModal({
               )}
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </AdminModal>
   );
 }

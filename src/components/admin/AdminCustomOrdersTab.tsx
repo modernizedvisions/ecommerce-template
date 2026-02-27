@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, Loader2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useForm } from 'react-hook-form';
 import { AdminSectionHeader } from './AdminSectionHeader';
 import { AdminSaveButton } from './AdminSaveButton';
+import { AdminModal } from './AdminModal';
 import { adminUploadImageUnified } from '../../lib/api';
 import { formatEasternDateTime } from '../../lib/dates';
 
@@ -313,6 +313,58 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
     if (typeof order.shipping_cents === 'number') return order.shipping_cents;
     return 0;
   };
+  const viewCurrentImageUrl = selectedOrder ? selectedOrder.imageUrl || selectedOrder.image_url || null : null;
+  const viewCurrentShipping = selectedOrder ? resolveShippingCents(selectedOrder) : 0;
+  const viewCurrentShowOnSold =
+    selectedOrder ? selectedOrder.showOnSoldProducts === true || selectedOrder.show_on_sold_products === 1 : false;
+  const viewDesiredShipping = normalizeShippingCents(viewShipping || '');
+  const viewHasChanges = Boolean(
+    selectedOrder &&
+      (viewImage.url !== viewCurrentImageUrl ||
+        viewDesiredShipping !== viewCurrentShipping ||
+        viewShowOnSoldProducts !== viewCurrentShowOnSold)
+  );
+  const viewSaveDisabled =
+    !onUpdateOrder || !selectedOrder || viewImage.uploading || !!viewImage.uploadError || !viewHasChanges;
+
+  const handleSaveViewOrder = async () => {
+    if (!selectedOrder || !onUpdateOrder) return;
+    const hasImageChange = viewImage.url !== viewCurrentImageUrl;
+    const hasShippingChange = viewDesiredShipping !== viewCurrentShipping;
+    const hasShowOnSoldChange = viewShowOnSoldProducts !== viewCurrentShowOnSold;
+    const hasChanges = hasImageChange || hasShippingChange || hasShowOnSoldChange;
+    if (viewImage.uploading || viewImage.uploadError || !hasChanges) return;
+
+    setViewSaveState('saving');
+    try {
+      const updates: any = {};
+      if (hasImageChange) {
+        updates.imageUrl = viewImage.url;
+        updates.imageId = viewImage.imageId || null;
+        updates.imageStorageKey = viewImage.storageKey || null;
+      }
+      if (hasShippingChange) updates.shippingCents = viewDesiredShipping;
+      if (hasShowOnSoldChange) updates.showOnSoldProducts = viewShowOnSoldProducts;
+      await onUpdateOrder(selectedOrder.id, updates);
+      setSelectedOrder((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              ...(hasImageChange ? { imageUrl: viewImage.url } : {}),
+              ...(hasShippingChange ? { shippingCents: viewDesiredShipping } : {}),
+              ...(hasShowOnSoldChange ? { showOnSoldProducts: viewShowOnSoldProducts } : {}),
+            }
+          : prev
+      );
+      setViewShipping(viewDesiredShipping ? (viewDesiredShipping / 100).toFixed(2) : '');
+      setViewSaveState('success');
+      setTimeout(() => setViewSaveState('idle'), 1500);
+    } catch (err) {
+      console.error('Failed to update custom order', err);
+      setViewSaveState('error');
+      setTimeout(() => setViewSaveState('idle'), 1500);
+    }
+  };
 
   return (
     <div className="lux-card p-6 space-y-4">
@@ -509,47 +561,40 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
         )}
       </div>
 
-      <Dialog
+      <AdminModal
         open={isViewOpen && !!selectedOrder}
-        onOpenChange={(next) => {
-          if (!next) closeView();
-        }}
-        overlayClassName="items-center px-3 py-6 sm:py-6"
-        contentClassName="max-w-xl max-h-[85vh] overflow-y-auto overflow-x-hidden"
+        onClose={closeView}
+        title={selectedOrder ? `Order ${normalizeDisplayId(selectedOrder)}` : 'Custom Order'}
+        description={selectedOrder ? `Placed ${safeDate(selectedOrder.createdAt || selectedOrder.created_at)}` : undefined}
+        maxWidth="2xl"
+        headerActions={
+          <button
+            type="button"
+            onClick={() => setIsArchiveConfirmOpen(true)}
+            disabled={!selectedOrder || !onArchiveOrder || isArchiving}
+            className="admin-btn-ghost px-2 py-1 text-[10px] !text-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Archive custom order"
+            title="Archive"
+          >
+            <Archive className="h-4 w-4" />
+          </button>
+        }
+        footer={
+          <div className="flex w-full flex-wrap items-center justify-end gap-2">
+            <button type="button" onClick={closeView} className="admin-btn-secondary px-4 py-2 text-[10px]">
+              Close
+            </button>
+            <AdminSaveButton
+              saveState={viewSaveState}
+              onClick={() => void handleSaveViewOrder()}
+              disabled={viewSaveDisabled}
+              idleLabel="Save Changes"
+            />
+          </div>
+        }
       >
         {selectedOrder && (
-          <DialogContent className="relative space-y-5">
-            <div className="absolute right-3 top-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsArchiveConfirmOpen(true)}
-                disabled={!selectedOrder || !onArchiveOrder || isArchiving}
-                className="lux-button--ghost px-2 py-1 text-[10px] !text-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Archive custom order"
-                title="Archive"
-              >
-                <Archive className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={closeView}
-                className="lux-button--ghost px-3 py-1 text-[10px]"
-              >
-                CLOSE
-              </button>
-            </div>
-
-            <div>
-              <p className="lux-label text-[10px] mb-1">Custom Order</p>
-              <div className="lux-heading text-xl">
-                Order {normalizeDisplayId(selectedOrder)}
-              </div>
-              <p className="text-sm text-charcoal/70">
-                Placed {safeDate(selectedOrder.createdAt || selectedOrder.created_at)}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-4">
               <section className="lux-panel p-4">
                 <p className="lux-label text-[10px] mb-1.5">Customer</p>
                 <div className="text-sm text-charcoal">{selectedOrder.customerName || '-'}</div>
@@ -753,67 +798,10 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
                 )}
               </section>
 
-              <div className="flex justify-end">
-                <AdminSaveButton
-                  saveState={viewSaveState}
-                  onClick={async () => {
-                    if (!selectedOrder || !onUpdateOrder) return;
-                    const currentUrl = selectedOrder.imageUrl || selectedOrder.image_url || null;
-                    const currentShipping = resolveShippingCents(selectedOrder);
-                    const currentShowOnSold =
-                      selectedOrder.showOnSoldProducts === true || selectedOrder.show_on_sold_products === 1;
-                    const desiredShipping = normalizeShippingCents(viewShipping || '');
-                    const hasImageChange = viewImage.url !== currentUrl;
-                    const hasShippingChange = desiredShipping !== currentShipping;
-                    const hasShowOnSoldChange = viewShowOnSoldProducts !== currentShowOnSold;
-                    const hasChanges = hasImageChange || hasShippingChange || hasShowOnSoldChange;
-                    if (viewImage.uploading || viewImage.uploadError || !hasChanges) return;
-                    setViewSaveState('saving');
-                    try {
-                      const updates: any = {};
-                      if (hasImageChange) {
-                        updates.imageUrl = viewImage.url;
-                        updates.imageId = viewImage.imageId || null;
-                        updates.imageStorageKey = viewImage.storageKey || null;
-                      }
-                      if (hasShippingChange) updates.shippingCents = desiredShipping;
-                      if (hasShowOnSoldChange) updates.showOnSoldProducts = viewShowOnSoldProducts;
-                      await onUpdateOrder(selectedOrder.id, updates);
-                      setSelectedOrder((prev: any) =>
-                        prev
-                          ? {
-                              ...prev,
-                              ...(hasImageChange ? { imageUrl: viewImage.url } : {}),
-                              ...(hasShippingChange ? { shippingCents: desiredShipping } : {}),
-                            }
-                          : prev
-                      );
-                      setViewShipping(desiredShipping ? (desiredShipping / 100).toFixed(2) : '');
-                      setViewSaveState('success');
-                      setTimeout(() => setViewSaveState('idle'), 1500);
-                    } catch (err) {
-                      console.error('Failed to update custom order', err);
-                      setViewSaveState('error');
-                      setTimeout(() => setViewSaveState('idle'), 1500);
-                    }
-                  }}
-                  disabled={
-                    !onUpdateOrder ||
-                    viewImage.uploading ||
-                    !!viewImage.uploadError ||
-                    (viewImage.url === (selectedOrder.imageUrl || selectedOrder.image_url || null) &&
-                      normalizeShippingCents(viewShipping || '') === resolveShippingCents(selectedOrder) &&
-                      viewShowOnSoldProducts ===
-                        (selectedOrder.showOnSoldProducts === true ||
-                          selectedOrder.show_on_sold_products === 1))
-                  }
-                  idleLabel="Save Changes"
-                />
-              </div>
             </div>
-          </DialogContent>
+          
         )}
-      </Dialog>
+      </AdminModal>
 
       <ConfirmDialog
         open={isArchiveConfirmOpen}
@@ -827,34 +815,49 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
         onCancel={() => setIsArchiveConfirmOpen(false)}
         onConfirm={handleArchive}
       />
-      <Dialog
+      <AdminModal
         open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-        overlayClassName="items-center px-3 py-6 sm:py-6"
-        contentClassName="max-h-[85vh] overflow-y-auto overflow-x-hidden"
-      >
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle>Create Custom Order</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <form
-              className="space-y-4"
-              onSubmit={handleSubmit(async (values) => {
-                if (draftImage.uploading || draftImage.uploadError) return;
-                const shippingCents = normalizeShippingCents(values.shipping || '');
-                const showOnSoldProducts = !!draftImage.url && values.showOnSoldProducts === true;
-                await onCreateOrder({
-                  ...values,
-                  shippingCents,
-                  showOnSoldProducts,
-                  imageUrl: draftImage.url || null,
-                  imageId: draftImage.imageId || null,
-                  imageStorageKey: draftImage.storageKey || null,
-                });
-                setIsModalOpen(false);
-              })}
+        onClose={() => setIsModalOpen(false)}
+        title="Create Custom Order"
+        maxWidth="xl"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="admin-btn-secondary px-4 py-2 text-[10px]"
             >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="create-custom-order-form"
+              disabled={formState.isSubmitting || draftImage.uploading || !!draftImage.uploadError}
+              className="admin-btn-primary px-4 py-2 text-[10px] disabled:opacity-60"
+            >
+              {formState.isSubmitting ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        }
+      >
+        <form
+          id="create-custom-order-form"
+          className="space-y-4"
+          onSubmit={handleSubmit(async (values) => {
+            if (draftImage.uploading || draftImage.uploadError) return;
+            const shippingCents = normalizeShippingCents(values.shipping || '');
+            const showOnSoldProducts = !!draftImage.url && values.showOnSoldProducts === true;
+            await onCreateOrder({
+              ...values,
+              shippingCents,
+              showOnSoldProducts,
+              imageUrl: draftImage.url || null,
+              imageId: draftImage.imageId || null,
+              imageStorageKey: draftImage.storageKey || null,
+            });
+            setIsModalOpen(false);
+          })}
+        >
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="lux-label mb-2 block">Customer Name</label>
@@ -980,26 +983,8 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="lux-button--ghost px-4 py-2 text-[10px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formState.isSubmitting || draftImage.uploading || !!draftImage.uploadError}
-                  className="lux-button px-4 py-2 text-[10px] disabled:opacity-60"
-                >
-                  {formState.isSubmitting ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </form>
+      </AdminModal>
     </div>
   );
 };

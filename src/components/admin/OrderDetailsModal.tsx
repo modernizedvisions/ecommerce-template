@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { AdminOrder } from '../../lib/db/orders';
 import { formatEasternDateTime } from '../../lib/dates';
 import { adminFetchOrderShipments, type OrderShipment } from '../../lib/adminShipping';
+import { AdminModal } from './AdminModal';
 
 interface OrderDetailsModalProps {
   open: boolean;
@@ -197,32 +198,21 @@ export function OrderDetailsModal({ open, order, onClose, onOpenShippingLabels }
     : 'No shipping address provided.';
 
   return (
-    <div
-      className="admin-modal-overlay z-40 px-3 py-6"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <AdminModal
+      open={open && !!order}
+      onClose={onClose}
+      title={`Order ${idLabel}`}
+      description={`Placed ${placedAt}`}
+      maxWidth="2xl"
+      footer={
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} className="admin-btn-secondary px-4 py-2 text-[10px]">
+            Close
+          </button>
+        </div>
+      }
     >
-      <div
-        className="admin-modal-panel admin-theme relative w-full max-w-xl p-6 max-h-[calc(100dvh-3.5rem)] overflow-y-auto"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-3 top-3 lux-button--ghost px-3 py-1 text-[10px]"
-        >
-          CLOSE
-        </button>
-
-        <div className="space-y-5">
-          <div>
-            <p className="lux-label text-[10px] mb-1">Order</p>
-            <div className="text-xl font-semibold text-charcoal">Order {idLabel}</div>
-            <p className="text-sm text-charcoal/70">Placed {placedAt}</p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4">
             <section className="lux-panel p-4">
               <p className="lux-label text-[10px] mb-1.5">Customer</p>
               <div className="space-y-1 text-sm text-charcoal/80">
@@ -421,9 +411,7 @@ export function OrderDetailsModal({ open, order, onClose, onOpenShippingLabels }
                 </div>
               </section>
             )}
-          </div>
-        </div>
       </div>
-    </div>
+    </AdminModal>
   );
 }

@@ -14,6 +14,7 @@ import { seedAdminProducts } from './seed/products';
 import { seedPromoCodes, seedPromotions } from './seed/promotions';
 import { seedShippingState } from './seed/shipping';
 import { seedSoldProducts } from './seed/soldProducts';
+import { createLocalImageAsset, revokeLocalImageAsset } from './localImageUpload';
 
 export type DemoState = {
   orders: AdminOrder[];
@@ -102,9 +103,7 @@ const setState = (updater: (current: DemoState) => DemoState): DemoState => {
 
 const revokeAllObjectUrls = (images: DemoImageAsset[]) => {
   images.forEach((asset) => {
-    if (asset.objectUrl?.startsWith('blob:')) {
-      URL.revokeObjectURL(asset.objectUrl);
-    }
+    revokeLocalImageAsset(asset);
   });
 };
 
@@ -215,21 +214,14 @@ export const actions = {
     setState((current) => ({ ...current, customOrders: current.customOrders.filter((entry) => entry.id !== id) }));
   },
   addImageAsset(file: File): DemoImageAsset {
-    const asset: DemoImageAsset = {
-      id: demoId('img'),
-      name: file.name,
-      size: file.size,
-      type: file.type || 'application/octet-stream',
-      objectUrl: URL.createObjectURL(file),
-      createdAt: timestamp(),
-    };
+    const asset = createLocalImageAsset(file);
     setState((current) => ({ ...current, images: [asset, ...current.images] }));
     return asset;
   },
   removeImageAsset(id: string): void {
     setState((current) => {
       const target = current.images.find((asset) => asset.id === id);
-      if (target?.objectUrl?.startsWith('blob:')) URL.revokeObjectURL(target.objectUrl);
+      revokeLocalImageAsset(target);
       return { ...current, images: current.images.filter((asset) => asset.id !== id) };
     });
   },

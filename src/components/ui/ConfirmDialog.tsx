@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './dialog';
+import { AdminModal } from '../admin/AdminModal';
 
 type ConfirmVariant = 'danger' | 'primary';
 
@@ -41,18 +34,18 @@ export function ConfirmDialog({
       : 'admin-btn-danger px-4 py-2 text-[11px]';
 
   return (
-    <Dialog
+    <AdminModal
       open={open}
-      onOpenChange={(next) => {
-        if (!next && !cancelDisabled) onCancel();
+      onClose={() => {
+        if (!cancelDisabled) onCancel();
       }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
+      title={title}
+      description={description}
+      maxWidth="xl"
+      closeOnOverlayClick={!cancelDisabled}
+      hideCloseButton={cancelDisabled}
+      footer={
+        <div className="flex w-full justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
@@ -69,8 +62,10 @@ export function ConfirmDialog({
           >
             {confirmText}
           </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      }
+    >
+      <div className="text-sm text-[var(--text2)]">{description}</div>
+    </AdminModal>
   );
 }

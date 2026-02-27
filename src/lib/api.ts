@@ -252,6 +252,12 @@ export async function adminUploadImage(
   if (isDemoAdmin()) {
     opts?.onStatus?.('optimizing');
     opts?.onStatus?.('uploading');
+    debugAdminImageUpload('[admin image upload] demo local mode (no network)', {
+      scope: 'products',
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    });
     return adminClient.uploadImage(file);
   }
   return adminUploadImageUnified(file, {
@@ -286,6 +292,12 @@ export async function adminUploadImageUnified(
   if (isDemoAdmin()) {
     opts?.onStatus?.('optimizing');
     opts?.onStatus?.('uploading');
+    debugAdminImageUpload('[admin image upload] demo local mode (no network)', {
+      scope: opts?.scope || 'products',
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    });
     return adminClient.uploadImage(file);
   }
   const scope = opts?.scope || 'products';
