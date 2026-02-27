@@ -79,7 +79,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const modal = (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-[2px] overscroll-contain sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px] overscroll-contain sm:p-6"
       onClick={(event) => {
         if (!closeOnOverlayClick) return;
         if (event.target === overlayRef.current) onClose();
@@ -88,7 +88,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        className={`admin-modal-panel admin-theme relative flex ${widthClass} max-h-[84vh] flex-col overflow-hidden ${panelClassName ?? ''}`}
+        className={`admin-modal-panel admin-theme relative flex min-h-0 ${widthClass} max-h-[calc(100dvh-6rem)] sm:max-h-[calc(100dvh-8rem)] flex-col overflow-hidden ${panelClassName ?? ''}`}
         onClick={(event) => event.stopPropagation()}
       >
         {showHeader && (

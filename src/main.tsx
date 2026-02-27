@@ -9,7 +9,7 @@ import './styles/adminTheme.css';
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
 
 const RouteLoading = () => (
-  <div className="min-h-[40vh] flex items-center justify-center text-sm opacity-80">
+  <div className="min-h-screen w-full bg-white flex items-center justify-center text-sm text-[var(--text2)]">
     Loading...
   </div>
 );

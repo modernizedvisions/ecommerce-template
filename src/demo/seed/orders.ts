@@ -1,8 +1,8 @@
-import type { AdminOrder } from '../../lib/db/orders';
+﻿import type { AdminOrder } from '../../lib/db/orders';
 
 const now = new Date('2026-02-26T12:00:00.000Z');
 const isoHoursAgo = (hours: number) => new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
-const productImage = (index: number) => `/demo-seed/products/prod-${String(index).padStart(2, '0')}.svg`;
+const productImage = (index: number) => `/demo-assets/products/product-${String(index).padStart(2, '0')}.svg`;
 
 export const seedAdminOrders: AdminOrder[] = [
   {
@@ -621,3 +621,4 @@ export const seedAdminOrders: AdminOrder[] = [
     ],
   },
 ];
+

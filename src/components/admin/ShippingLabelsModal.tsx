@@ -721,7 +721,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                     const downloadDisabledTitle = 'No label yet';
                     return (
                       <div key={shipment.id} className="lux-panel p-4">
-                        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div className="mb-3 space-y-3">
                           <div className="min-w-0 flex flex-wrap items-center gap-2">
                             <h4 className="font-semibold text-charcoal">Parcel #{shipment.parcelIndex}</h4>
                             {parcelStatus.state !== 'idle' && (

@@ -1243,11 +1243,11 @@ export function AdminPage() {
                     isActive ? 'admin-tab-active' : ''
                   }`}
                 >
-                  <span className="relative inline-flex items-center">
-                    <span>{tab.label}</span>
+                  <span className="px-1">{tab.label}</span>
+                  <span className="pointer-events-none absolute -top-2 -right-2">
                     <TabCountBadge
                       count={badge ?? 0}
-                      className={`absolute -top-2 -right-2 ${isActive ? 'ring-2 ring-[var(--bg)]' : ''}`}
+                      className="ring-2 ring-[var(--bg)]"
                     />
                   </span>
                 </button>

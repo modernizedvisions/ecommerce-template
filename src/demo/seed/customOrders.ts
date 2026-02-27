@@ -1,8 +1,8 @@
-import type { AdminCustomOrder } from '../../lib/db/customOrders';
+﻿import type { AdminCustomOrder } from '../../lib/db/customOrders';
 
 const now = new Date('2026-02-26T12:00:00.000Z');
 const isoDaysAgo = (days: number) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
-const customImage = (index: number) => `/demo-seed/custom-orders/co-${String(index).padStart(2, '0')}.svg`;
+const customImage = (index: number) => `/demo-assets/custom-orders/custom-${String(index).padStart(2, '0')}.svg`;
 
 export const seedAdminCustomOrders: AdminCustomOrder[] = [
   {
@@ -186,3 +186,4 @@ export const seedAdminCustomOrders: AdminCustomOrder[] = [
     archivedAt: null,
   },
 ];
+

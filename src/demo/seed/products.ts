@@ -1,4 +1,4 @@
-import type { Product } from '../../lib/types';
+﻿import type { Product } from '../../lib/types';
 
 type ProductSeedRow = {
   id: string;
@@ -22,7 +22,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 3200,
     quantityAvailable: 18,
     oneoff: false,
-    image: '/demo-seed/products/prod-01.svg',
+    image: '/demo-assets/products/product-01.svg',
   },
   {
     id: 'seed_prod_002',
@@ -33,7 +33,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 2800,
     quantityAvailable: 22,
     oneoff: false,
-    image: '/demo-seed/products/prod-02.svg',
+    image: '/demo-assets/products/product-02.svg',
   },
   {
     id: 'seed_prod_003',
@@ -44,7 +44,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 2400,
     quantityAvailable: 35,
     oneoff: false,
-    image: '/demo-seed/products/prod-03.svg',
+    image: '/demo-assets/products/product-03.svg',
   },
   {
     id: 'seed_prod_004',
@@ -55,7 +55,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 3600,
     quantityAvailable: 12,
     oneoff: false,
-    image: '/demo-seed/products/prod-04.svg',
+    image: '/demo-assets/products/product-04.svg',
   },
   {
     id: 'seed_prod_005',
@@ -66,7 +66,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 1800,
     quantityAvailable: 40,
     oneoff: false,
-    image: '/demo-seed/products/prod-05.svg',
+    image: '/demo-assets/products/product-05.svg',
   },
   {
     id: 'seed_prod_006',
@@ -77,7 +77,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 1200,
     quantityAvailable: 70,
     oneoff: false,
-    image: '/demo-seed/products/prod-06.svg',
+    image: '/demo-assets/products/product-06.svg',
   },
   {
     id: 'seed_prod_007',
@@ -88,7 +88,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 900,
     quantityAvailable: 120,
     oneoff: false,
-    image: '/demo-seed/products/prod-07.svg',
+    image: '/demo-assets/products/product-07.svg',
   },
   {
     id: 'seed_prod_008',
@@ -99,7 +99,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 4200,
     quantityAvailable: 8,
     oneoff: false,
-    image: '/demo-seed/products/prod-08.svg',
+    image: '/demo-assets/products/product-08.svg',
   },
   {
     id: 'seed_prod_009',
@@ -110,7 +110,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 3000,
     quantityAvailable: 14,
     oneoff: false,
-    image: '/demo-seed/products/prod-09.svg',
+    image: '/demo-assets/products/product-09.svg',
   },
   {
     id: 'seed_prod_010',
@@ -121,7 +121,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 3400,
     quantityAvailable: 10,
     oneoff: false,
-    image: '/demo-seed/products/prod-10.svg',
+    image: '/demo-assets/products/product-10.svg',
   },
   {
     id: 'seed_prod_011',
@@ -132,7 +132,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 4600,
     quantityAvailable: 9,
     oneoff: false,
-    image: '/demo-seed/products/prod-11.svg',
+    image: '/demo-assets/products/product-11.svg',
   },
   {
     id: 'seed_prod_012',
@@ -143,7 +143,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 2200,
     quantityAvailable: 26,
     oneoff: false,
-    image: '/demo-seed/products/prod-12.svg',
+    image: '/demo-assets/products/product-12.svg',
   },
   {
     id: 'seed_prod_013',
@@ -154,7 +154,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 3800,
     quantityAvailable: 11,
     oneoff: false,
-    image: '/demo-seed/products/prod-13.svg',
+    image: '/demo-assets/products/product-13.svg',
   },
   {
     id: 'seed_prod_014',
@@ -165,7 +165,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 5200,
     quantityAvailable: 7,
     oneoff: false,
-    image: '/demo-seed/products/prod-14.svg',
+    image: '/demo-assets/products/product-14.svg',
   },
   {
     id: 'seed_prod_015',
@@ -176,7 +176,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 2600,
     quantityAvailable: 30,
     oneoff: false,
-    image: '/demo-seed/products/prod-15.svg',
+    image: '/demo-assets/products/product-15.svg',
   },
   {
     id: 'seed_prod_016',
@@ -187,7 +187,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 9800,
     quantityAvailable: 5,
     oneoff: false,
-    image: '/demo-seed/products/prod-16.svg',
+    image: '/demo-assets/products/product-16.svg',
   },
   {
     id: 'seed_prod_017',
@@ -198,7 +198,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 7500,
     quantityAvailable: 20,
     oneoff: false,
-    image: '/demo-seed/products/prod-17.svg',
+    image: '/demo-assets/products/product-17.svg',
   },
   {
     id: 'seed_prod_018',
@@ -209,7 +209,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 11000,
     quantityAvailable: 3,
     oneoff: true,
-    image: '/demo-seed/products/prod-18.svg',
+    image: '/demo-assets/products/product-18.svg',
   },
   {
     id: 'seed_prod_019',
@@ -220,7 +220,7 @@ const rows: ProductSeedRow[] = [
     priceCents: 2000,
     quantityAvailable: 24,
     oneoff: false,
-    image: '/demo-seed/products/prod-19.svg',
+    image: '/demo-assets/products/product-19.svg',
   },
   {
     id: 'seed_prod_020',
@@ -231,24 +231,35 @@ const rows: ProductSeedRow[] = [
     priceCents: 6800,
     quantityAvailable: 6,
     oneoff: true,
-    image: '/demo-seed/products/prod-20.svg',
+    image: '/demo-assets/products/product-20.svg',
   },
 ];
 
-export const seedAdminProducts: Product[] = rows.map((row) => ({
-  id: row.id,
-  name: row.name,
-  description: row.description,
-  imageUrls: [row.image],
-  imageUrl: row.image,
-  type: row.type,
-  category: row.category,
-  categories: [row.category],
-  oneoff: row.oneoff,
-  quantityAvailable: row.quantityAvailable,
-  visible: true,
-  isSold: false,
-  priceCents: row.priceCents,
-  shippingOverrideEnabled: false,
-  shippingOverrideAmountCents: null,
-}));
+export const seedAdminProducts: Product[] = rows.map((row, index) => {
+  const secondary = `/demo-assets/products/product-${String(((index + 6) % rows.length) + 1).padStart(2, '0')}.svg`;
+  const tertiary = `/demo-assets/products/product-${String(((index + 13) % rows.length) + 1).padStart(2, '0')}.svg`;
+  const gallery = [row.image, secondary, index % 2 === 0 ? tertiary : null].filter(
+    (image): image is string => !!image
+  );
+  const uniqueGallery = Array.from(new Set(gallery));
+
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    imageUrls: uniqueGallery,
+    imageUrl: uniqueGallery[0],
+    thumbnailUrl: uniqueGallery[0],
+    type: row.type,
+    category: row.category,
+    categories: [row.category],
+    oneoff: row.oneoff,
+    quantityAvailable: row.quantityAvailable,
+    visible: true,
+    isSold: false,
+    priceCents: row.priceCents,
+    shippingOverrideEnabled: false,
+    shippingOverrideAmountCents: null,
+  };
+});
+

@@ -1,4 +1,4 @@
-import type { GalleryImage, HomeSiteContent } from '../../lib/types';
+﻿import type { GalleryImage, HomeSiteContent } from '../../lib/types';
 
 export type SeedCustomOrderExample = {
   id: string;
@@ -13,24 +13,24 @@ export type SeedCustomOrderExample = {
 
 export const seedHomeContent: HomeSiteContent = {
   heroImages: {
-    left: 'https://picsum.photos/seed/demo-hero-1/900/1200',
-    middle: 'https://picsum.photos/seed/demo-hero-2/900/1200',
-    right: 'https://picsum.photos/seed/demo-hero-3/900/1200',
+    left: '/demo-assets/home/hero-01.svg',
+    middle: '/demo-assets/home/hero-02.svg',
+    right: '/demo-assets/home/hero-03.svg',
   },
   heroRotationEnabled: true,
   homeGallery: Array.from({ length: 8 }).map((_, idx) => ({
-    imageUrl: `https://picsum.photos/seed/demo-home-${idx + 1}/700/900`,
+    imageUrl: `/demo-assets/home/home-${String(idx + 1).padStart(2, '0')}.svg`,
     descriptor: `Collection ${idx + 1}`,
   })),
   aboutImages: {
-    home: 'https://picsum.photos/seed/demo-about-home/900/1200',
-    about: 'https://picsum.photos/seed/demo-about-page/900/1200',
+    home: '/demo-assets/home/about-home.svg',
+    about: '/demo-assets/home/about-page.svg',
   },
 };
 
 export const seedGalleryImages: GalleryImage[] = Array.from({ length: 8 }).map((_, idx) => ({
   id: `seed_gallery_${String(idx + 1).padStart(3, '0')}`,
-  imageUrl: `https://picsum.photos/seed/demo-gallery-${idx + 1}/800/1000`,
+  imageUrl: `/demo-assets/gallery/gallery-${String(idx + 1).padStart(2, '0')}.svg`,
   imageId: null as unknown as string,
   hidden: false,
   alt: `Gallery image ${idx + 1}`,
@@ -40,10 +40,11 @@ export const seedGalleryImages: GalleryImage[] = Array.from({ length: 8 }).map((
 
 export const seedCustomOrderExamples: SeedCustomOrderExample[] = Array.from({ length: 9 }).map((_, idx) => ({
   id: `seed_example_${String(idx + 1).padStart(3, '0')}`,
-  imageUrl: `https://picsum.photos/seed/demo-custom-example-${idx + 1}/700/900`,
+  imageUrl: `/demo-assets/custom-order-examples/example-${String(idx + 1).padStart(2, '0')}.svg`,
   title: `Example ${idx + 1}`,
   description: `Custom oyster shell example design ${idx + 1}.`,
   tags: ['custom', 'coastal'],
   sortOrder: idx,
   isActive: true,
 }));
+

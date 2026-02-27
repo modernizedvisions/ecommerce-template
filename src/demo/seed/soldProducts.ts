@@ -1,4 +1,4 @@
-import type { Product } from '../../lib/types';
+﻿import type { Product } from '../../lib/types';
 
 const soldAt = [
   '2026-02-25T17:22:00.000Z',
@@ -36,7 +36,7 @@ const soldRows: SoldSeed[] = [
     type: 'Apparel',
     priceCents: 3400,
     soldAt: soldAt[0],
-    image: '/demo-seed/sold/sold-01.svg',
+    image: '/demo-assets/sold/sold-01.svg',
   },
   {
     id: 'seed_sold_002',
@@ -45,7 +45,7 @@ const soldRows: SoldSeed[] = [
     type: 'Apparel',
     priceCents: 3000,
     soldAt: soldAt[1],
-    image: '/demo-seed/sold/sold-02.svg',
+    image: '/demo-assets/sold/sold-02.svg',
   },
   {
     id: 'seed_sold_003',
@@ -54,7 +54,7 @@ const soldRows: SoldSeed[] = [
     type: 'Merch',
     priceCents: 2800,
     soldAt: soldAt[2],
-    image: '/demo-seed/sold/sold-03.svg',
+    image: '/demo-assets/sold/sold-03.svg',
   },
   {
     id: 'seed_sold_004',
@@ -63,7 +63,7 @@ const soldRows: SoldSeed[] = [
     type: 'Merch',
     priceCents: 1800,
     soldAt: soldAt[3],
-    image: '/demo-seed/sold/sold-04.svg',
+    image: '/demo-assets/sold/sold-04.svg',
   },
   {
     id: 'seed_sold_005',
@@ -72,7 +72,7 @@ const soldRows: SoldSeed[] = [
     type: 'Art Prints',
     priceCents: 5200,
     soldAt: soldAt[4],
-    image: '/demo-seed/sold/sold-05.svg',
+    image: '/demo-assets/sold/sold-05.svg',
   },
   {
     id: 'seed_sold_006',
@@ -81,7 +81,7 @@ const soldRows: SoldSeed[] = [
     type: 'Custom Art',
     priceCents: 9000,
     soldAt: soldAt[5],
-    image: '/demo-seed/sold/sold-06.svg',
+    image: '/demo-assets/sold/sold-06.svg',
   },
   {
     id: 'seed_sold_007',
@@ -90,7 +90,7 @@ const soldRows: SoldSeed[] = [
     type: 'Ceramics',
     priceCents: 7200,
     soldAt: soldAt[6],
-    image: '/demo-seed/sold/sold-07.svg',
+    image: '/demo-assets/sold/sold-07.svg',
   },
   {
     id: 'seed_sold_008',
@@ -99,7 +99,7 @@ const soldRows: SoldSeed[] = [
     type: 'Candles',
     priceCents: 4600,
     soldAt: soldAt[7],
-    image: '/demo-seed/sold/sold-08.svg',
+    image: '/demo-assets/sold/sold-08.svg',
   },
   {
     id: 'seed_sold_009',
@@ -108,7 +108,7 @@ const soldRows: SoldSeed[] = [
     type: 'Jewelry',
     priceCents: 5800,
     soldAt: soldAt[8],
-    image: '/demo-seed/sold/sold-09.svg',
+    image: '/demo-assets/sold/sold-09.svg',
   },
   {
     id: 'seed_sold_010',
@@ -117,7 +117,7 @@ const soldRows: SoldSeed[] = [
     type: 'Wood Goods',
     priceCents: 4200,
     soldAt: soldAt[9],
-    image: '/demo-seed/sold/sold-10.svg',
+    image: '/demo-assets/sold/sold-10.svg',
   },
   {
     id: 'seed_sold_011',
@@ -126,7 +126,7 @@ const soldRows: SoldSeed[] = [
     type: 'Wood Goods',
     priceCents: 6400,
     soldAt: soldAt[10],
-    image: '/demo-seed/sold/sold-11.svg',
+    image: '/demo-assets/sold/sold-11.svg',
   },
   {
     id: 'seed_sold_012',
@@ -135,7 +135,7 @@ const soldRows: SoldSeed[] = [
     type: 'Leather Goods',
     priceCents: 5000,
     soldAt: soldAt[11],
-    image: '/demo-seed/sold/sold-12.svg',
+    image: '/demo-assets/sold/sold-12.svg',
   },
   {
     id: 'seed_sold_013',
@@ -144,7 +144,7 @@ const soldRows: SoldSeed[] = [
     type: 'Crochet',
     priceCents: 6800,
     soldAt: soldAt[12],
-    image: '/demo-seed/sold/sold-13.svg',
+    image: '/demo-assets/sold/sold-13.svg',
   },
   {
     id: 'seed_sold_014',
@@ -153,7 +153,7 @@ const soldRows: SoldSeed[] = [
     type: 'Stationery',
     priceCents: 5400,
     soldAt: soldAt[13],
-    image: '/demo-seed/sold/sold-14.svg',
+    image: '/demo-assets/sold/sold-14.svg',
   },
   {
     id: 'seed_sold_015',
@@ -162,7 +162,7 @@ const soldRows: SoldSeed[] = [
     type: 'Art',
     priceCents: 12800,
     soldAt: soldAt[14],
-    image: '/demo-seed/sold/sold-15.svg',
+    image: '/demo-assets/sold/sold-15.svg',
   },
 ];
 
@@ -182,3 +182,4 @@ export const seedSoldProducts: Product[] = soldRows.map((row) => ({
   priceCents: row.priceCents,
   soldAt: row.soldAt,
 }));
+

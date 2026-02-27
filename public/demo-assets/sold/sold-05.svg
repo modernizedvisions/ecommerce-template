@@ -1,0 +1,25 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+  <defs>
+    <linearGradient id="g65" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ece9e3"/>
+      <stop offset="100%" stop-color="#cbbca9"/>
+    </linearGradient>
+    <linearGradient id="h65" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#fdfcf9" stop-opacity="0.98"/>
+      <stop offset="100%" stop-color="#ece9e3" stop-opacity="0.95"/>
+    </linearGradient>
+    <filter id="blur65" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="28"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="1200" fill="url(#g65)"/>
+  <ellipse cx="445" cy="395" rx="220" ry="180" fill="#fdfcf9" fill-opacity="0.35" filter="url(#blur65)"/>
+  <ellipse cx="185" cy="585" rx="260" ry="190" fill="#6f5a4b" fill-opacity="0.18" filter="url(#blur65)"/>
+  <rect x="56" y="68" width="1088" height="1064" rx="44" fill="url(#h65)" stroke="#fdfcf9" stroke-opacity="0.55"/>
+  <rect x="478" y="454" width="345" height="245" rx="26" fill="#6f5a4b"/>
+  <rect x="496" y="472" width="309" height="98" rx="16" fill="#fdfcf9" fill-opacity="0.36"/>
+  <ellipse cx="650" cy="727" rx="148" ry="24" fill="#000" fill-opacity="0.14" filter="url(#blur65)"/>
+  <circle cx="535" cy="839" r="175" fill="#fdfcf9" fill-opacity="0.58"/>
+  <circle cx="535" cy="839" r="126" fill="#cbbca9" fill-opacity="0.22"/>
+  <rect x="120" y="972" width="960" height="58" rx="29" fill="#2d251f" fill-opacity="0.15"/>
+</svg>
