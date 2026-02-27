@@ -142,6 +142,39 @@ const normalizeCountryCode = (value: string): string => value.trim().toUpperCase
 const isValidUSStateCode = (value: string): boolean => US_STATE_CODES.has(value.trim().toUpperCase());
 const DEFAULT_SHIP_FROM_COMPANY = 'Admin Demo';
 const DEFAULT_SHIP_FROM_NAME = 'Mia Reynolds';
+const DEFAULT_BOX_PRESETS: Array<{
+  id: string;
+  name: string;
+  lengthIn: number;
+  widthIn: number;
+  heightIn: number;
+  defaultWeightLb: number;
+}> = [
+  {
+    id: 'default_box_small',
+    name: 'Small',
+    lengthIn: 8,
+    widthIn: 6,
+    heightIn: 4,
+    defaultWeightLb: 1,
+  },
+  {
+    id: 'default_box_medium',
+    name: 'Medium',
+    lengthIn: 12,
+    widthIn: 9,
+    heightIn: 6,
+    defaultWeightLb: 2.5,
+  },
+  {
+    id: 'default_box_large',
+    name: 'Large',
+    lengthIn: 16,
+    widthIn: 12,
+    heightIn: 10,
+    defaultWeightLb: 5,
+  },
+];
 
 const toFiniteNumberOrNull = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
@@ -281,6 +314,37 @@ export async function ensureShippingLabelsSchema(db: D1Database): Promise<void> 
     if (!shipmentColumnNames.has('tracking_email_sent_at')) {
       await db.prepare(`ALTER TABLE order_shipments ADD COLUMN tracking_email_sent_at TEXT;`).run();
     }
+  }
+
+  await ensureDefaultBoxPresets(db);
+}
+
+async function ensureDefaultBoxPresets(db: D1Database): Promise<void> {
+  const countRow = await db
+    .prepare(`SELECT COUNT(1) AS count FROM shipping_box_presets;`)
+    .first<{ count: number | string | null }>();
+  const presetCount = Number(countRow?.count ?? 0);
+  if (Number.isFinite(presetCount) && presetCount > 0) return;
+
+  const timestamp = nowIso();
+  for (const preset of DEFAULT_BOX_PRESETS) {
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO shipping_box_presets (
+          id, name, length_in, width_in, height_in, default_weight_lb, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`
+      )
+      .bind(
+        preset.id,
+        preset.name,
+        preset.lengthIn,
+        preset.widthIn,
+        preset.heightIn,
+        preset.defaultWeightLb,
+        timestamp,
+        timestamp
+      )
+      .run();
   }
 }
 

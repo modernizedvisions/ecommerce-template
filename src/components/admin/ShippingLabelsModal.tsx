@@ -551,8 +551,16 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
   if (!open || !order) return null;
 
   return (
-    <div className="admin-modal-overlay z-50 px-3 py-6">
-      <div className="admin-modal-panel admin-theme relative w-full max-w-5xl p-6 max-h-[90vh] overflow-y-auto">
+    <div
+      className="admin-modal-overlay z-50 px-3 py-6"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="admin-modal-panel admin-theme relative w-full max-w-5xl p-6 max-h-[calc(100dvh-3.5rem)] overflow-y-auto"
+        onClick={(event) => event.stopPropagation()}
+      >
         <button
           type="button"
           onClick={onClose}

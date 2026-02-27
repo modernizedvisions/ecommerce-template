@@ -1208,7 +1208,7 @@ export function AdminPage() {
               <div className="text-center text-xs sm:text-sm text-[var(--text2)]">
                 <span className="font-medium text-[var(--text)]">Public Demo Mode</span>
                 <span className="mx-2 text-[var(--muted)]">|</span>
-                <span>Changes reset on refresh</span>
+                <span>Changes Reset On Refresh</span>
               </div>
               <div className="flex justify-end">
                 <button

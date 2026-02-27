@@ -232,12 +232,17 @@
     background: rgba(15, 15, 15, 0.35);
     backdrop-filter: blur(2px);
     padding: 1rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .admin-modal-panel {
     width: 100%;
     max-width: 42rem;
-    max-height: 92vh;
+    max-height: calc(100dvh - 2rem);
+    margin: auto;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     border-radius: 12px;
     border: 1px solid var(--border);
@@ -305,8 +310,9 @@
   }
 
   .admin-tab:hover {
-    background: var(--cardHover);
-    color: var(--text);
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accentContrast);
   }
 
   .admin-tab-active {

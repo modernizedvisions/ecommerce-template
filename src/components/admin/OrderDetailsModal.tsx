@@ -197,8 +197,16 @@ export function OrderDetailsModal({ open, order, onClose, onOpenShippingLabels }
     : 'No shipping address provided.';
 
   return (
-    <div className="admin-modal-overlay z-40 px-3 py-6">
-      <div className="admin-modal-panel admin-theme relative w-full max-w-xl p-6 max-h-[85vh] overflow-y-auto">
+    <div
+      className="admin-modal-overlay z-40 px-3 py-6"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="admin-modal-panel admin-theme relative w-full max-w-xl p-6 max-h-[calc(100dvh-3.5rem)] overflow-y-auto"
+        onClick={(event) => event.stopPropagation()}
+      >
         <button
           type="button"
           onClick={onClose}

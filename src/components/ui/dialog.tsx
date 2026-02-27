@@ -47,7 +47,7 @@ export const Dialog: React.FC<DialogProps> = ({
 
   const overlay = (
     <div
-      className={`admin-modal-overlay items-start sm:items-center ${overlayClassName ?? ''}`}
+      className={`admin-modal-overlay items-center ${overlayClassName ?? ''}`}
       ref={overlayRef}
       onClick={(e) => {
         if (e.target === overlayRef.current) {
@@ -56,7 +56,7 @@ export const Dialog: React.FC<DialogProps> = ({
       }}
     >
       <div
-        className={`admin-modal-panel admin-theme relative flex w-full max-w-2xl max-h-[92vh] flex-col ${contentClassName ?? ''}`}
+        className={`admin-modal-panel admin-theme relative flex w-full max-w-2xl max-h-[calc(100dvh-2rem)] flex-col overflow-y-auto overflow-x-hidden ${contentClassName ?? ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
