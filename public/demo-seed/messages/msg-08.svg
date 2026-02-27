@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <rect width="800" height="800" fill="#fdf8f6"/>
+  <rect x="60" y="60" width="680" height="680" rx="28" fill="#fff7ed" stroke="#fed7aa" stroke-width="6"/>
+  <text x="100" y="160" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="42" fill="#7c2d12">Customer Reference Photo #08</text>
+  <text x="100" y="220" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="24" fill="#9a3412">Demo seed image (local)</text>
+  <circle cx="466" cy="412" r="70" fill="#fecaca"/>
+  <rect x="384" y="310" width="356" height="140" rx="18" fill="#ffedd5"/>
+  <rect x="100" y="520" width="614" height="40" rx="12" fill="#ffedd5"/>
+  <rect x="100" y="580" width="420" height="40" rx="12" fill="#ffedd5"/>
+</svg>

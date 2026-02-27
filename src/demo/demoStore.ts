@@ -8,6 +8,7 @@ import { seedCategories } from './seed/categories';
 import { seedHomeContent, seedGalleryImages, seedCustomOrderExamples, type SeedCustomOrderExample } from './seed/content';
 import { seedEmailListItems } from './seed/emailList';
 import { seedAdminMessages } from './seed/messages';
+import { seedAdminCustomOrders } from './seed/customOrders';
 import { seedAdminOrders } from './seed/orders';
 import { seedAdminProducts } from './seed/products';
 import { seedPromoCodes, seedPromotions } from './seed/promotions';
@@ -68,7 +69,7 @@ const createInitialState = (): DemoState => ({
   categories: clone(seedCategories),
   promotions: clone(seedPromotions),
   promoCodes: clone(seedPromoCodes),
-  customOrders: [],
+  customOrders: clone(seedAdminCustomOrders),
   images: [],
   emailList: clone(seedEmailListItems),
   homeContent: clone(seedHomeContent),
@@ -316,5 +317,6 @@ export const actions = {
     emit();
   },
 };
+
 
 

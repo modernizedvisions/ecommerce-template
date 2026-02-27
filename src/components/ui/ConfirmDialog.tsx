@@ -37,8 +37,8 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const confirmClasses =
     confirmVariant === 'primary'
-      ? 'lux-button px-4 py-2 text-[11px]'
-      : 'lux-button px-4 py-2 text-[11px] !bg-rose-600 hover:!bg-rose-700';
+      ? 'admin-btn-primary px-4 py-2 text-[11px]'
+      : 'admin-btn-danger px-4 py-2 text-[11px]';
 
   return (
     <Dialog
@@ -57,7 +57,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={cancelDisabled}
-            className="lux-button--ghost px-4 py-2 text-[11px] disabled:opacity-50"
+            className="admin-btn-secondary px-4 py-2 text-[11px] disabled:opacity-50"
           >
             {cancelText}
           </button>

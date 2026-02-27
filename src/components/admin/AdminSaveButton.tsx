@@ -22,7 +22,7 @@ export function AdminSaveButton({
       type="button"
       onClick={onClick}
       disabled={disabled || saveState === 'saving'}
-      className={`lux-button px-4 py-2 text-[11px] tracking-[0.22em] ${className}`.trim()}
+      className={`admin-btn-primary px-4 py-2 text-[11px] tracking-[0.16em] ${className}`.trim()}
     >
       {saveState === 'saving' ? (
         <>
@@ -31,7 +31,7 @@ export function AdminSaveButton({
         </>
       ) : saveState === 'success' ? (
         <>
-          <CheckCircle className="h-4 w-4 text-green-200" />
+          <CheckCircle className="h-4 w-4 text-[var(--success)]" />
           Saved
         </>
       ) : (

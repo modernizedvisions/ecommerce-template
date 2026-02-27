@@ -197,8 +197,8 @@ export function OrderDetailsModal({ open, order, onClose, onOpenShippingLabels }
     : 'No shipping address provided.';
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-deep-ocean/40 px-3 py-6 backdrop-blur-[2px]">
-      <div className="lux-card bg-white relative w-full max-w-xl p-6 max-h-[85vh] overflow-y-auto">
+    <div className="admin-modal-overlay z-40 px-3 py-6">
+      <div className="admin-modal-panel admin-theme relative w-full max-w-xl p-6 max-h-[85vh] overflow-y-auto">
         <button
           type="button"
           onClick={onClose}

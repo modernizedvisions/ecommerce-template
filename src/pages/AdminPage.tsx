@@ -139,8 +139,8 @@ const AdminTabBadge = ({ count, isActive }: AdminTabBadgeProps) => {
 
   return (
     <span
-      className={`notif-circle absolute -top-1 -right-1 inline-flex h-5 w-5 items-center justify-center bg-soft-gold text-[10px] font-semibold leading-none text-deep-ocean shadow-sm ${
-        isActive ? 'ring-1 ring-white/70' : 'ring-1 ring-deep-ocean/20'
+      className={`notif-circle absolute -top-1 -right-1 inline-flex h-5 w-5 items-center justify-center border border-[var(--border)] text-[10px] font-semibold leading-none shadow-sm ${
+        isActive ? 'ring-1 ring-white/70' : 'ring-1 ring-[rgba(15,15,15,0.15)]'
       }`}
     >
       {safeCount > 9 ? '9+' : String(safeCount)}
@@ -1199,33 +1199,33 @@ export function AdminPage() {
 
   return (
     <>
-    <div className="admin-dashboard min-h-screen bg-gradient-to-b from-[var(--warm-linen)] via-[var(--sand)] to-[var(--linen)] text-charcoal py-12 overflow-x-hidden">
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="admin-page py-6 overflow-x-hidden">
+      <div className="admin-shell">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="lux-heading text-3xl">Admin Dashboard</h1>
+          <h1 className="admin-header">Admin Dashboard</h1>
           {demoMode ? (
             <button
               onClick={handleLogout}
-              className="lux-button px-4 py-2 text-[10px]"
+              className="admin-btn-primary px-4 py-2 text-[10px]"
             >
               Reset Demo
             </button>
           ) : (
             <button
               onClick={handleLogout}
-              className="lux-button--ghost px-4 py-2 text-[10px]"
+              className="admin-btn-secondary px-4 py-2 text-[10px]"
             >
               Logout
             </button>
           )}
         </div>
         {demoMode && (
-          <div className="mb-4 rounded-shell border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="admin-alert admin-alert-warning mb-4">
             Public Demo Mode - changes reset on refresh
           </div>
         )}
 
-          <div className="mb-6 border-b border-driftwood/50 pb-2">
+          <div className="admin-tabs mb-6">
           <nav className="flex gap-3 justify-start md:justify-center overflow-x-auto overflow-y-visible whitespace-nowrap -mx-4 px-4 py-2 md:mx-0 md:px-0">
             {ADMIN_TABS.map((tab) => {
               const isActive = activeTab === tab.key;
@@ -1234,10 +1234,8 @@ export function AdminPage() {
                 <button
                   key={tab.key}
                   onClick={() => navigate(ADMIN_TAB_TO_PATH[tab.key])}
-                  className={`relative inline-flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-[0.24em] transition-all ${
-                    isActive
-                      ? 'lux-button shadow-none'
-                      : 'lux-button--ghost shadow-none'
+                  className={`admin-tab relative inline-flex items-center gap-2 px-4 py-2 text-[10px] transition-all ${
+                    isActive ? 'admin-tab-active' : ''
                   }`}
                 >
                   {tab.label}

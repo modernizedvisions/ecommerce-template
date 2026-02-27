@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ScrollToTop } from './components/ScrollToTop';
 import { Toaster } from 'sonner';
 import './index.css';
+import './styles/adminTheme.css';
 
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
 
@@ -40,3 +41,4 @@ createRoot(document.getElementById('root')!).render(
     <Toaster richColors position="top-center" />
   </StrictMode>
 );
+
