@@ -564,6 +564,7 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
       <AdminModal
         open={isViewOpen && !!selectedOrder}
         onClose={closeView}
+        dataModal="custom-order-view"
         title={selectedOrder ? `Order ${normalizeDisplayId(selectedOrder)}` : 'Custom Order'}
         description={selectedOrder ? `Placed ${safeDate(selectedOrder.createdAt || selectedOrder.created_at)}` : undefined}
         maxWidth="2xl"
@@ -818,6 +819,7 @@ export const AdminCustomOrdersTab: React.FC<AdminCustomOrdersTabProps> = ({
       <AdminModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        dataModal="custom-order-create"
         title="Create Custom Order"
         maxWidth="xl"
         footer={

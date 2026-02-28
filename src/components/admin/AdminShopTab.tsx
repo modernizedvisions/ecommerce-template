@@ -877,6 +877,7 @@ export const AdminShopTab: React.FC<AdminShopTabProps> = ({
       <AdminModal
         open={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
+        dataModal="edit-product"
         title="Edit Product"
         maxWidth="4xl"
         headerActions={

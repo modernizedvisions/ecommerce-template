@@ -16,6 +16,9 @@ import {
   type ShipFromSettings,
   type ShippingBoxPreset,
 } from '../../lib/adminShipping';
+import { isDemoAdmin } from '../../lib/demoMode';
+import { actions as demoStoreActions } from '../../demo/demoStore';
+import { buyMockLabel, getMockQuotes, type MockQuote } from '../../demo/mockShipping';
 import { AdminModal } from './AdminModal';
 
 type ParcelDraft = {
@@ -162,6 +165,28 @@ const numbersMatch = (left: number | null, right: number | null): boolean => {
   return Math.abs(left - right) < 0.0001;
 };
 
+const parseMockDeliveryDays = (value: string): { etaDaysMin: number | null; etaDaysMax: number | null } => {
+  const match = value.match(/(\d+)\s*[-\u2013]\s*(\d+)/);
+  if (!match) return { etaDaysMin: null, etaDaysMax: null };
+  return {
+    etaDaysMin: Number(match[1]),
+    etaDaysMax: Number(match[2]),
+  };
+};
+
+const toShipmentQuote = (quote: MockQuote): ShipmentQuote => {
+  const eta = parseMockDeliveryDays(quote.deliveryDays);
+  return {
+    id: quote.id,
+    carrier: quote.courier,
+    service: quote.service,
+    amountCents: quote.priceCents,
+    currency: quote.currency,
+    etaDaysMin: eta.etaDaysMin,
+    etaDaysMax: eta.etaDaysMax,
+  };
+};
+
 const initialDraftFromShipment = (shipment: OrderShipment): ParcelDraft => ({
   boxPresetId: shipment.boxPresetId || '',
   useCustom:
@@ -190,6 +215,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
   const [error, setError] = useState<string>('');
 
   const orderId = order?.id || null;
+  const demoMode = isDemoAdmin();
   const missingShipFrom = useMemo(() => requiredShipFromMissing(shipFrom), [shipFrom]);
   const shipFromReady = missingShipFrom.length === 0;
   const orderCurrency = order?.currency || 'USD';
@@ -204,6 +230,75 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
 
   const setParcelError = (parcelId: string, action: ParcelUiAction, message: string, subtext?: string) => {
     setParcelStatusById((prev) => ({ ...prev, [parcelId]: { state: 'error', action, message, subtext } }));
+  };
+
+  const clearDerivedShipmentState = (shipmentId: string) => {
+    setQuotesByShipment((prev) => {
+      if (!(shipmentId in prev)) return prev;
+      const next = { ...prev };
+      delete next[shipmentId];
+      return next;
+    });
+    setSelectedQuoteByShipment((prev) => {
+      if (!(shipmentId in prev)) return prev;
+      const next = { ...prev };
+      delete next[shipmentId];
+      return next;
+    });
+    setQuoteWarningByShipment((prev) => {
+      if (!(shipmentId in prev)) return prev;
+      const next = { ...prev };
+      delete next[shipmentId];
+      return next;
+    });
+    setQuoteDebugByShipment((prev) => {
+      if (!(shipmentId in prev)) return prev;
+      const next = { ...prev };
+      delete next[shipmentId];
+      return next;
+    });
+    setPostBuyByShipment((prev) => {
+      if (!(shipmentId in prev)) return prev;
+      const next = { ...prev };
+      delete next[shipmentId];
+      return next;
+    });
+    setParcelStatusById((prev) => ({
+      ...prev,
+      [shipmentId]: { state: 'idle' },
+    }));
+  };
+
+  const invalidateShipmentAfterInputChange = (shipmentId: string) => {
+    const currentShipment = shipments.find((entry) => entry.id === shipmentId);
+    if (!currentShipment) return;
+
+    const hasDerivedState =
+      !!(quotesByShipment[shipmentId]?.length || selectedQuoteByShipment[shipmentId] || quoteWarningByShipment[shipmentId]);
+    const hasPurchasedLabel = !!(currentShipment.labelUrl || currentShipment.purchasedAt || postBuyByShipment[shipmentId]);
+    if (!hasDerivedState && !hasPurchasedLabel) return;
+
+    clearDerivedShipmentState(shipmentId);
+
+    const resetShipment: OrderShipment = {
+      ...currentShipment,
+      quoteSelectedId: null,
+      carrier: demoMode ? null : currentShipment.carrier,
+      service: demoMode ? null : currentShipment.service,
+      trackingNumber: demoMode ? null : currentShipment.trackingNumber,
+      labelUrl: demoMode ? null : currentShipment.labelUrl,
+      labelCostAmountCents: demoMode ? null : currentShipment.labelCostAmountCents,
+      easyshipLabelId: demoMode ? null : currentShipment.easyshipLabelId,
+      labelState: demoMode ? 'pending' : currentShipment.labelState,
+      purchasedAt: demoMode ? null : currentShipment.purchasedAt,
+      updatedAt: new Date().toISOString(),
+    };
+    setShipments((prev) => prev.map((entry) => (entry.id === shipmentId ? resetShipment : entry)));
+
+    if (demoMode && orderId) {
+      demoStoreActions.updateOrderShipment(orderId, resetShipment);
+      demoStoreActions.setOrderQuotes(shipmentId, []);
+    }
   };
 
   const seedDrafts = (nextShipments: OrderShipment[]) => {
@@ -264,6 +359,10 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
 
   useEffect(() => {
     if (open) return;
+    setQuotesByShipment({});
+    setSelectedQuoteByShipment({});
+    setQuoteWarningByShipment({});
+    setQuoteDebugByShipment({});
     setParcelStatusById({});
     setPostBuyByShipment({});
     setBusyByShipment({});
@@ -287,20 +386,29 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
   };
 
   const updateDraft = (shipmentId: string, patch: Partial<ParcelDraft>) => {
+    const current = drafts[shipmentId] || {
+      boxPresetId: '',
+      useCustom: false,
+      customLengthIn: '',
+      customWidthIn: '',
+      customHeightIn: '',
+      weightLb: '',
+    };
+    const nextDraft = { ...current, ...patch };
+    const changed =
+      nextDraft.boxPresetId !== current.boxPresetId ||
+      nextDraft.useCustom !== current.useCustom ||
+      nextDraft.customLengthIn !== current.customLengthIn ||
+      nextDraft.customWidthIn !== current.customWidthIn ||
+      nextDraft.customHeightIn !== current.customHeightIn ||
+      nextDraft.weightLb !== current.weightLb;
+    if (!changed) return;
+
     setDrafts((prev) => ({
       ...prev,
-      [shipmentId]: {
-        ...(prev[shipmentId] || {
-          boxPresetId: '',
-          useCustom: false,
-          customLengthIn: '',
-          customWidthIn: '',
-          customHeightIn: '',
-          weightLb: '',
-        }),
-        ...patch,
-      },
+      [shipmentId]: nextDraft,
     }));
+    invalidateShipmentAfterInputChange(shipmentId);
   };
 
   const toggleCustomDimensions = (shipmentId: string, enabled: boolean) => {
@@ -328,12 +436,15 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
       }
       return { ...prev, [shipmentId]: next };
     });
+    invalidateShipmentAfterInputChange(shipmentId);
   };
 
-  const persistShipmentDraft = async (shipmentId: string): Promise<void> => {
-    if (!orderId) return;
+  const persistShipmentDraft = async (
+    shipmentId: string
+  ): Promise<{ shipment: OrderShipment | null; shipments: OrderShipment[] } | null> => {
+    if (!orderId) return null;
     const draft = drafts[shipmentId];
-    if (!draft) return;
+    if (!draft) return null;
 
     const weightLb = toNumberOrNull(draft.weightLb);
     if (weightLb === null || weightLb <= 0) {
@@ -379,6 +490,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
     const updated = await adminUpdateOrderShipment(orderId, shipmentId, payload);
     setShipments(updated.shipments);
     seedDrafts(updated.shipments);
+    return updated;
   };
 
   const handleAddParcel = async () => {
@@ -452,6 +564,12 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
 
   const handleGetQuotes = async (shipment: OrderShipment) => {
     if (!orderId) return;
+    const draft = drafts[shipment.id] || initialDraftFromShipment(shipment);
+    const draftWeight = toNumberOrNull(draft.weightLb);
+    if (draftWeight === null || draftWeight < 0.1) {
+      setParcelError(shipment.id, 'quotes', 'Weight must be at least 0.1 lb.');
+      return;
+    }
     setLoading(shipment.id, 'quotes');
     setQuoteWarningByShipment((prev) => {
       const next = { ...prev };
@@ -459,7 +577,79 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
       return next;
     });
     try {
-      await persistShipmentDraft(shipment.id);
+      const persisted = await persistShipmentDraft(shipment.id);
+      const latestShipment =
+        (persisted?.shipment && persisted.shipment.id === shipment.id ? persisted.shipment : null) ||
+        persisted?.shipments.find((entry) => entry.id === shipment.id) ||
+        shipments.find((entry) => entry.id === shipment.id) ||
+        shipment;
+
+      if (demoMode) {
+        const resolvedPreset = boxPresets.find((preset) => preset.id === draft.boxPresetId) || null;
+        const dims = draft.useCustom
+          ? {
+              l: toNumberOrNull(draft.customLengthIn) || 0,
+              w: toNumberOrNull(draft.customWidthIn) || 0,
+              h: toNumberOrNull(draft.customHeightIn) || 0,
+            }
+          : latestShipment.effectiveLengthIn &&
+            latestShipment.effectiveWidthIn &&
+            latestShipment.effectiveHeightIn
+          ? {
+              l: latestShipment.effectiveLengthIn,
+              w: latestShipment.effectiveWidthIn,
+              h: latestShipment.effectiveHeightIn,
+            }
+          : null;
+        const mockQuotes = await getMockQuotes({
+          weightLb: draftWeight,
+          boxPresetName: resolvedPreset?.name || latestShipment.boxPresetName || undefined,
+          dimsIn: dims,
+        });
+        const mappedRates = mockQuotes.map(toShipmentQuote);
+        const updatedShipment: OrderShipment = {
+          ...latestShipment,
+          quoteSelectedId: null,
+          carrier: null,
+          service: null,
+          trackingNumber: null,
+          labelUrl: null,
+          labelCostAmountCents: null,
+          easyshipLabelId: null,
+          labelState: 'pending',
+          purchasedAt: null,
+          updatedAt: new Date().toISOString(),
+        };
+        setShipments((prev) => prev.map((entry) => (entry.id === shipment.id ? updatedShipment : entry)));
+        setQuotesByShipment((prev) => ({ ...prev, [shipment.id]: mappedRates }));
+        setSelectedQuoteByShipment((prev) => ({
+          ...prev,
+          [shipment.id]: null,
+        }));
+        setQuoteDebugByShipment((prev) => {
+          const next = { ...prev };
+          delete next[shipment.id];
+          return next;
+        });
+        setQuoteWarningByShipment((prev) => {
+          const next = { ...prev };
+          delete next[shipment.id];
+          return next;
+        });
+        if (orderId) {
+          demoStoreActions.setOrderQuotes(shipment.id, mappedRates);
+          demoStoreActions.updateOrderShipment(orderId, updatedShipment);
+        }
+        if (mappedRates.length === 0) {
+          const normalized = normalizeParcelActionError('NO_QUOTES');
+          setQuoteWarningByShipment((prev) => ({ ...prev, [shipment.id]: normalized.message }));
+          setParcelError(shipment.id, 'quotes', normalized.message, normalized.subtext);
+          return;
+        }
+        setSuccess(shipment.id, 'quotes', 'Quotes Fetched.');
+        return;
+      }
+
       const quoted = await adminFetchShipmentQuotes(orderId, shipment.id);
       setShipments(quoted.shipments);
       seedDrafts(quoted.shipments);
@@ -500,8 +690,60 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
       if (quoteWarningByShipment[shipment.id]) {
         throw new Error(quoteWarningByShipment[shipment.id]);
       }
-      await persistShipmentDraft(shipment.id);
+      const persisted = await persistShipmentDraft(shipment.id);
       const selectedQuoteId = selectedQuoteByShipment[shipment.id] || null;
+      if (demoMode) {
+        if (!selectedQuoteId) {
+          throw new Error('Select a quote before buying a label.');
+        }
+        const selectedRate = (quotesByShipment[shipment.id] || []).find((rate) => rate.id === selectedQuoteId) || null;
+        if (!selectedRate) {
+          throw new Error('Selected quote is no longer available. Fetch quotes again.');
+        }
+        const latestShipment =
+          (persisted?.shipment && persisted.shipment.id === shipment.id ? persisted.shipment : null) ||
+          persisted?.shipments.find((entry) => entry.id === shipment.id) ||
+          shipments.find((entry) => entry.id === shipment.id) ||
+          shipment;
+        const purchase = await buyMockLabel({
+          quoteId: selectedQuoteId,
+          orderId,
+          parcelIndex: latestShipment.parcelIndex,
+        });
+        const updatedShipment: OrderShipment = {
+          ...latestShipment,
+          easyshipShipmentId: latestShipment.easyshipShipmentId || `demo_shipment_${latestShipment.id}`,
+          easyshipLabelId: purchase.labelId,
+          carrier: selectedRate.carrier,
+          service: selectedRate.service,
+          trackingNumber: purchase.trackingNumber,
+          labelUrl: purchase.labelUrl,
+          labelCostAmountCents: selectedRate.amountCents,
+          labelCurrency: selectedRate.currency || 'USD',
+          labelState: 'generated',
+          quoteSelectedId: selectedQuoteId,
+          errorMessage: null,
+          purchasedAt: purchase.purchasedAt,
+          updatedAt: purchase.purchasedAt,
+        };
+        setPostBuyByShipment((prev) => ({ ...prev, [shipment.id]: true }));
+        setShipments((prev) => prev.map((entry) => (entry.id === shipment.id ? updatedShipment : entry)));
+        setSelectedQuoteByShipment((prev) => ({ ...prev, [shipment.id]: selectedQuoteId }));
+        demoStoreActions.updateOrderShipment(orderId, updatedShipment);
+        demoStoreActions.attachLabelToOrder(orderId, {
+          shipmentId: updatedShipment.id,
+          labelUrl: updatedShipment.labelUrl,
+          carrier: updatedShipment.carrier,
+          service: updatedShipment.service,
+          trackingNumber: updatedShipment.trackingNumber,
+          labelCostAmountCents: updatedShipment.labelCostAmountCents,
+          labelCurrency: updatedShipment.labelCurrency || 'USD',
+          createdAt: purchase.purchasedAt,
+        });
+        setSuccess(shipment.id, 'buy', 'Label purchased.');
+        return;
+      }
+
       const bought = await adminBuyShipmentLabel(orderId, shipment.id, {
         quoteSelectedId: selectedQuoteId,
       });
@@ -531,6 +773,14 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
     if (!orderId) return;
     setLoading(shipment.id, 'refresh');
     try {
+      if (demoMode) {
+        setSuccess(
+          shipment.id,
+          'refresh',
+          shipment.labelUrl ? 'Label status is up to date.' : 'Label not purchased yet.'
+        );
+        return;
+      }
       const refreshed = await adminFetchShipmentLabelStatus(orderId, shipment.id);
       setShipments(refreshed.shipments);
       seedDrafts(refreshed.shipments);
@@ -555,6 +805,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
     <AdminModal
       open={open && !!order}
       onClose={onClose}
+      dataModal="shipping-labels"
       title="Shipping Labels"
       description={`Order ${order.displayOrderId || order.id}`}
       maxWidth="5xl"
@@ -662,6 +913,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                     const customWidthDraft = toNumberOrNull(draft.customWidthIn);
                     const customHeightDraft = toNumberOrNull(draft.customHeightIn);
                     const weightDraft = toNumberOrNull(draft.weightLb);
+                    const hasValidWeight = weightDraft !== null && weightDraft >= 0.1;
                     const customDraftSaved =
                       draft.useCustom &&
                       customLengthDraft !== null &&
@@ -719,6 +971,12 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                       return 'Carrier Not Selected';
                     })();
                     const downloadDisabledTitle = 'No label yet';
+                    const buyDisabled =
+                      !shipFromReady ||
+                      !!quoteWarning ||
+                      !canBuyLabel ||
+                      isParcelLoading ||
+                      (demoMode && (!rates.length || !selectedQuoteId));
                     return (
                       <div key={shipment.id} className="lux-panel p-4">
                         <div className="mb-3 space-y-3">
@@ -781,6 +1039,7 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                                 href={shipment.labelUrl}
                                 target="_blank"
                                 rel="noreferrer"
+                                download
                                 className="lux-button--ghost px-3 py-2 text-[10px]"
                               >
                                 Download Label (PDF)
@@ -799,8 +1058,14 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                               <button
                                 type="button"
                                 className="lux-button--ghost px-3 py-2 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={customNeedsSaveBeforeQuotes ? 'Save custom dimensions before getting a quote.' : undefined}
-                                disabled={customNeedsSaveBeforeQuotes || !canBuyLabel || isParcelLoading}
+                                title={
+                                  customNeedsSaveBeforeQuotes
+                                    ? 'Save custom dimensions before getting a quote.'
+                                    : !hasValidWeight
+                                    ? 'Weight must be at least 0.1 lb.'
+                                    : undefined
+                                }
+                                disabled={!hasValidWeight || customNeedsSaveBeforeQuotes || !canBuyLabel || isParcelLoading}
                                 onClick={() => void handleGetQuotes(shipment)}
                               >
                                 Get Quotes
@@ -810,7 +1075,8 @@ export function ShippingLabelsModal({ open, order, onClose, onOpenSettings }: Sh
                               <button
                                 type="button"
                                 className="lux-button px-3 py-2 text-[10px]"
-                                disabled={!shipFromReady || !!quoteWarning || !canBuyLabel || isParcelLoading}
+                                title={demoMode && (!rates.length || !selectedQuoteId) ? 'Select a quote first.' : undefined}
+                                disabled={buyDisabled}
                                 onClick={() => void handleBuyLabel(shipment)}
                               >
                                 Buy Label

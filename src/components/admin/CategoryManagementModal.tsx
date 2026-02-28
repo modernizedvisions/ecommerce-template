@@ -277,6 +277,7 @@ export function CategoryManagementModal({
     <AdminModal
       open={open}
       onClose={onClose}
+      dataModal="category-management"
       title="Category Management"
       description="Add or delete categories available to products."
       maxWidth="3xl"

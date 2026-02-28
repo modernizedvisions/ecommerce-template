@@ -313,6 +313,7 @@ export const AdminMessagesTab: React.FC<AdminMessagesTabProps> = ({ onCreateCust
       <AdminModal
         open={isDialogOpen && !!selectedMessage}
         onClose={handleCloseDialog}
+        dataModal="message-details"
         title="Message Details"
         maxWidth="3xl"
         headerActions={

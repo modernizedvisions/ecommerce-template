@@ -6,6 +6,7 @@ type AdminModalWidth = 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
 interface AdminModalProps {
   open: boolean;
   onClose: () => void;
+  dataModal?: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
   children: React.ReactNode;
@@ -32,6 +33,7 @@ const widthClassMap: Record<AdminModalWidth, string> = {
 export const AdminModal: React.FC<AdminModalProps> = ({
   open,
   onClose,
+  dataModal,
   title,
   description,
   children,
@@ -88,7 +90,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        className={`admin-modal-panel admin-theme relative flex min-h-0 ${widthClass} max-h-[calc(100dvh-6rem)] sm:max-h-[calc(100dvh-8rem)] flex-col overflow-hidden ${panelClassName ?? ''}`}
+        data-modal={dataModal}
+        className={`admin-modal-panel admin-theme relative flex min-h-0 ${widthClass} max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)] flex-col overflow-hidden ${panelClassName ?? ''}`}
         onClick={(event) => event.stopPropagation()}
       >
         {showHeader && (

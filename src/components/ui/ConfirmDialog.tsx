@@ -39,6 +39,7 @@ export function ConfirmDialog({
       onClose={() => {
         if (!cancelDisabled) onCancel();
       }}
+      dataModal="confirm-dialog"
       title={title}
       description={description}
       maxWidth="xl"

@@ -201,6 +201,7 @@ export function OrderDetailsModal({ open, order, onClose, onOpenShippingLabels }
     <AdminModal
       open={open && !!order}
       onClose={onClose}
+      dataModal="order-details"
       title={`Order ${idLabel}`}
       description={`Placed ${placedAt}`}
       maxWidth="2xl"
